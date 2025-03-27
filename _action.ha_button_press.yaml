@@ -1,0 +1,6 @@
+homeassistant.action:
+  action: button.press
+  data_template:
+    entity_id: "button.{{button_entity_id}}"
+  variables:
+    button_entity_id: "return id(${button_id}).get_object_id();"

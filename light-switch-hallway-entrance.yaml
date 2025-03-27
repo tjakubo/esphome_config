@@ -1,0 +1,26 @@
+substitutions:
+  device_type: "light_switch"
+  path: "hallway/entrance"
+  board: esp01_1m
+  # Relays
+  relay_type: "light_relay"
+  relay_1_suffix: "strip"
+  relay_1_restore_mode: always_on
+  relay_2_suffix: "center"
+  relay_2_restore_mode: always_off
+  # Buttons
+  button_type: "light_button"
+  long_click_hold_time: 1s
+  mode_swap_hold_time: 10s
+  direct_relay_control_suffix: "direct_relay_control"
+  left_button_relay: "1"
+  right_button_relay: "2"
+  # LEDs
+  led_brightness: 12%
+
+esphome:
+  name: "light-switch-hallway-entrance"
+
+<<: !include hardware/esp8266.yaml
+
+<<: !include device/gosund_sw9.yaml

@@ -1,0 +1,162 @@
+defaults: 
+  relay_1_restore_mode: always_on
+  relay_2_restore_mode: always_on
+  left_button_relay: "1"
+  right_button_relay: "2"
+
+substitutions:
+  relay_type: "light_relay"
+  direct_relay_control_suffix: "direct_relay_control"
+  button_type: "light_button"
+  long_click_hold_time: 1s
+  mode_swap_hold_time: 10s
+  led_brightness: 12%
+
+output:
+  # Relays
+  - platform: gpio
+    id: output_relay_1
+    pin: GPIO14
+  - platform: gpio
+    id: output_relay_2
+    pin: GPIO12
+  # LEDs
+  - platform: esp8266_pwm
+    pin:
+      number: GPIO13
+      inverted: true
+    frequency: 1000 Hz
+    id: pwm_green_leds
+  - platform: esp8266_pwm
+    pin:
+      number: GPIO02
+      inverted: true
+    frequency: 1000 Hz
+    id: pwm_red_led_left
+  - platform: esp8266_pwm
+    pin:
+      number: GPIO04
+      inverted: true
+    frequency: 1000 Hz
+    id: pwm_red_led_right
+
+switch:
+  - platform: template
+    optimistic: true
+    name: "${type}/${path}/${direct_relay_control_suffix}"
+    id: switch_direct_relay_control
+    restore_mode: always_off
+    turn_on_action:
+      - light.turn_off: light_green_leds
+      - light.turn_on: light_red_led_left
+      - light.turn_on: light_red_led_right
+    turn_off_action:
+      - light.turn_on: 
+          id: light_green_leds
+          brightness: ${led_brightness}
+      - light.turn_off: light_red_led_left
+      - light.turn_off: light_red_led_right
+  - platform: output
+    name: "${relay_type}/${path}/${relay_1_suffix}"
+    id: switch_relay_1
+    output: output_relay_1
+    restore_mode: ${relay_1_restore_mode}
+  - platform: output
+    name: "${relay_type}/${path}/${relay_2_suffix}"
+    id: switch_relay_2
+    output: output_relay_2
+    restore_mode: ${relay_2_restore_mode}
+
+light:
+  - platform: monochromatic
+    id: light_green_leds
+    output: pwm_green_leds
+  - platform: monochromatic
+    id: light_red_led_left
+    output: pwm_red_led_left
+  - platform: monochromatic
+    id: light_red_led_right
+    output: pwm_red_led_right
+
+button:
+  - platform: template
+    name: "${button_type}/${path}/left/short"
+    id: button_left_short
+  - platform: template
+    name: "${button_type}/${path}/left/long"
+    id: button_left_long
+  - platform: template
+    name: "${button_type}/${path}/right/short"
+    id: button_right_short
+  - platform: template
+    name: "${button_type}/${path}/right/long"
+    id: button_right_long
+
+binary_sensor:
+  - platform: gpio
+    id: button_sensor_left
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_multi_click:
+      - timing:
+          - ON for at most ${long_click_hold_time}
+        then:
+          if: 
+            condition: 
+              switch.is_on: switch_direct_relay_control
+            then: 
+              switch.toggle: switch_relay_${left_button_relay}
+            else: 
+              !include { file: _action.ha_button_press.yaml, vars: { button_id: button_left_short } }
+      - timing: 
+          - ON for at least ${long_click_hold_time}
+        then:
+          !include { file: _action.ha_button_press.yaml, vars: { button_id: button_left_long } }
+      - timing:
+          - ON for at least ${mode_swap_hold_time}
+        then:
+          switch.toggle: switch_direct_relay_control
+
+  - platform: gpio
+    id: button_sensor_right
+    pin:
+      number: GPIO5
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_multi_click:
+      - timing:
+          - ON for at most ${long_click_hold_time}
+        then:
+          if: 
+            condition: 
+              switch.is_on: switch_direct_relay_control
+            then: 
+              switch.toggle: switch_relay_${right_button_relay}
+            else: 
+              !include { file: _action.ha_button_press.yaml, vars: { button_id: button_right_short } }
+      - timing: 
+          - ON for at least ${long_click_hold_time}
+        then:
+          !include { file: _action.ha_button_press.yaml, vars: { button_id: button_right_long } }
+      - timing:
+          - ON for at least ${mode_swap_hold_time}
+        then:
+          switch.toggle: switch_direct_relay_control
+      
+  - platform: status
+    name: "Status"
+    
+sensor:
+  - platform: wifi_signal
+    name: "WiFi signal"
+    update_interval: 60s
+  - platform: uptime
+    name: "Uptime"

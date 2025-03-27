@@ -1,0 +1,27 @@
+substitutions:
+  device_type: "light_switch"
+  path: "living_room"
+  board: esp01_1m
+  # Relays
+  relay_type: "light_relay"
+  relay_1_suffix: "center"
+  relay_1_restore_mode: always_on
+  relay_2_suffix: "spot"
+  relay_2_restore_mode: always_on
+  # Buttons
+  button_type: "light_button"
+  long_click_hold_time: 1s
+  mode_swap_hold_time: 10s
+  direct_relay_control_suffix: "direct_relay_control"
+  left_button_relay: "2"
+  right_button_relay: "1"
+  # LEDs
+  led_brightness: 12%
+
+esphome:
+  name: "light-switch-living-room"
+  name_add_mac_suffix: false
+
+<<: !include hardware/esp8266.yaml
+
+<<: !include device/gosund_sw9.yaml
