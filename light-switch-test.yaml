@@ -2,9 +2,8 @@ substitutions:
   type: "light_switch"
   path: "test"
   hostname: "light-switch-test"
-  # Relays
-  relay_1_suffix: "one"
-  relay_2_suffix: "two"
+  relay_1_suffix: "hello"
+  relay_2_suffix: "world"
 
 packages:
   hardware: !include _hardware.esp8266.yaml
@@ -12,7 +11,6 @@ packages:
     file: _device.gosund_sw9.yaml
     vars: 
       relay_2_restore_mode: always_off
-      right_button_relay: 1
 
-wifi: 
-  use_address: "192.168.0.203"
+#wifi: 
+#  use_address: "192.168.0.203"

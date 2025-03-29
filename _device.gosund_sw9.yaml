@@ -152,11 +152,11 @@ binary_sensor:
           switch.toggle: switch_direct_relay_control
       
   - platform: status
-    name: "Status"
+    name: "${type}/${path}/status"
     
 sensor:
   - platform: wifi_signal
     name: "WiFi signal"
     update_interval: 60s
   - platform: uptime
-    name: "Uptime"
+    name: "${type}/${path}/uptime"
