@@ -1,5 +1,4 @@
 substitutions:
-  type: "light_switch"
   path: "hallway/inner"
   hostname: "light-switch-hallway-inner"
   relay_1_suffix: "unused_1"

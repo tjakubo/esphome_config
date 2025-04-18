@@ -1,0 +1,15 @@
+packages:
+  presence: !include 
+    file: _ibeacon.common.presence.yaml
+    vars: 
+      beacon_uuid: ${uuid}
+      beacon_major: ${major}
+      beacon_minor: ${minor}
+      name: ${name}
+  rssi: !include 
+    file: _ibeacon.common.rssi.yaml
+    vars: 
+      beacon_uuid: ${uuid}
+      beacon_major: ${major}
+      beacon_minor: ${minor}
+      name: ${name}

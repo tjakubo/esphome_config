@@ -1,0 +1,15 @@
+substitutions:
+  path: "office"
+  hostname: "apollo-office"
+
+packages:
+  hardware: !include _hardware.apollo_msr2.yaml
+  device: !include _device.apollo_msr2.core.yaml
+  beacon: !include _device.apollo_msr2.beacon.yaml
+  beacon_sensor_tj_zenfone9: !include 
+    file: _ibeacon.common.presence_and_rssi.yaml
+    vars: 
+      uuid: "7cf5f6c3-79f8-43f5-9b7a-ab3fd8ead9af"
+      major: "100"
+      minor: "40004"
+      name: "tj_zenfone9"

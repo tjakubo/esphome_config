@@ -1,5 +1,4 @@
 substitutions:
-  type: "light_switch"
   path: "hallway/entrance"
   hostname: "light-switch-hallway-entrance"
   relay_1_suffix: "strip"

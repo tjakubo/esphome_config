@@ -1,0 +1,45 @@
+esphome:
+  name: "${name}"
+  friendly_name: Apollo MSR-2
+  comment: Apollo MSR-2
+  name_add_mac_suffix: true
+  platformio_options:
+    board_build.flash_mode: dio
+
+  on_boot:
+  - priority: 900.0
+    then:
+      - lambda: |-
+          id(radar_bluetooth).turn_off();
+  - priority: -10
+    then:
+      - if:
+          condition:
+            - lambda: "return id(runTest);"
+          then:
+            - lambda: "id(testScript).execute();"
+
+  project:
+    name: "ApolloAutomation.MSR-2_BLE"
+    version: "${version}"
+
+  min_version: 2025.2.0
+
+  
+dashboard_import:
+  package_import_url: github://ApolloAutomation/MSR-2/Integrations/ESPHome/MSR-2_BLE.yaml
+  import_full_config: false
+
+wifi:
+  ap:
+    ssid: "Apollo MSR2 Hotspot"
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+bluetooth_proxy:
+  active: true
+
+packages:
+  core: !include Core.yaml

@@ -1,0 +1,7 @@
+binary_sensor:
+  - platform: ble_presence
+    ibeacon_uuid: ${beacon_uuid}
+    ibeacon_major: ${beacon_major}
+    ibeacon_minor: ${beacon_minor}
+    name: "ble/${path}/${name}/presence"
+    timeout: 45s

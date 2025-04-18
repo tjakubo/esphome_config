@@ -43,7 +43,7 @@ output:
 switch:
   - platform: template
     optimistic: true
-    name: "${type}/${path}/${direct_relay_control_suffix}"
+    name: "light_switch/${path}/${direct_relay_control_suffix}"
     id: switch_direct_relay_control
     restore_mode: always_off
     turn_on_action:
@@ -152,11 +152,11 @@ binary_sensor:
           switch.toggle: switch_direct_relay_control
       
   - platform: status
-    name: "${type}/${path}/status"
+    name: "light_switch/${path}/status"
     
 sensor:
   - platform: wifi_signal
     name: "WiFi signal"
     update_interval: 60s
   - platform: uptime
-    name: "${type}/${path}/uptime"
+    name: "light_switch/${path}/uptime"

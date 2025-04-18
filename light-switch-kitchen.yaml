@@ -1,5 +1,4 @@
 substitutions:
-  type: "light_switch"
   path: "kitchen"
   hostname: "light-switch-kitchen"
   relay_1_suffix: "spot"

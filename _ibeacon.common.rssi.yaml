@@ -1,0 +1,6 @@
+sensor:
+  - platform: ble_rssi
+    ibeacon_uuid: ${uuid}
+    ibeacon_major: ${major}
+    ibeacon_minor: ${minor}
+    name: "ble/${path}/${name}/rssi"

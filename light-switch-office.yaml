@@ -1,5 +1,4 @@
 substitutions:
-  type: "light_switch"
   path: "office"
   hostname: "light-switch-office"
   relay_1_suffix: "back"
