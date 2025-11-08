@@ -1,0 +1,8 @@
+packages:
+  beacon_sensor_tj_zenfone9: !include 
+    file: _ibeacon.common.rssi.yaml
+    vars: 
+      ibeacon_uuid: "f1324fd0-b367-46f2-90ef-115b54001588"
+      ibeacon_major: 100
+      ibeacon_minor: 40004
+      name: "tj_zenfone9"

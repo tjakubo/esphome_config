@@ -1,6 +1,22 @@
-homeassistant.action:
-  action: button.press
-  data_template:
-    entity_id: "button.{{button_entity_id}}"
-  variables:
-    button_entity_id: "return id(${button_id}).get_object_id();"
+#homeassistant.action:
+#  action: button.press
+#  data_template:
+#    entity_id: "button.{{button_entity_id}}"
+#  variables:
+#    button_entity_id: "return id(${button_id}).get_object_id();"
+
+script:
+  - id: script_action_ha_button_press
+    parameters:
+      entity_id: string
+    then:
+      - homeassistant.action:
+          action: button.press
+          #data_template:
+          #  entity_id: "button.{{entity_id}}"
+          #variables:    
+          #  entity_id: !lambda return entity_id;
+          data:
+            entity_id: !lambda return std::string{ "button." } + entity_id;
+          #variables:    
+          #entity_id: !lambda return entity_id;

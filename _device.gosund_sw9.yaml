@@ -1,26 +1,43 @@
 defaults: 
-  relay_1_restore_mode: always_on
-  relay_2_restore_mode: always_on
   left_button_relay: "1"
   right_button_relay: "2"
 
 substitutions:
+  device_type: "light_switch"
   relay_type: "light_relay"
   direct_relay_control_suffix: "direct_relay_control"
   button_type: "light_button"
   long_click_hold_time: 1s
-  mode_swap_hold_time: 10s
-  led_brightness: 12%
+  toggle_lighting_required_hold_time: 5s
+  toggle_direct_relay_control_hold_time: 10s
+  green_led_brightness_nominal: 12%
+  green_led_brightness_presence_disabled: 20%
+  red_led_brightness_presence_disabled: 40%
+  entity_id_ha_helper_mode_presence_lighting: "input_boolean.helper_mode_${mode_id_path}_presence_lighting"
+  entity_id_ha_helper_mode_lighting_required: "input_boolean.helper_mode_${mode_id_path}_lighting_required"
+
+packages:
+  action_ha_button_press: !include _action.ha_button_press.yaml
+  sensors_diagnostic_common: !include _sensors.diagnostic.common.yaml
+
+api:
+  on_client_connected:
+    - switch.turn_off: switch_direct_relay_control
+    - script.execute: script_update_leds
+  on_client_disconnected:
+    if:
+      condition:
+        not: api.connected
+      then: 
+        switch.turn_on: switch_direct_relay_control
 
 output:
-  # Relays
   - platform: gpio
     id: output_relay_1
     pin: GPIO14
   - platform: gpio
     id: output_relay_2
     pin: GPIO12
-  # LEDs
   - platform: esp8266_pwm
     pin:
       number: GPIO13
@@ -40,32 +57,145 @@ output:
     frequency: 1000 Hz
     id: pwm_red_led_right
 
+script:
+  - id: script_set_leds_direct_relay_control
+    then:
+      - light.turn_off: 
+          id: light_green_leds
+      - light.turn_on: 
+          id: light_red_led_left
+          brightness: 100%
+      - light.turn_on: 
+          id: light_red_led_right
+          brightness: 100%
+
+  - id: script_set_leds_presence_disabled
+    then:
+      - light.turn_on: 
+          id: light_green_leds
+          brightness: ${green_led_brightness_presence_disabled}
+      - light.turn_on: 
+          id: light_red_led_left
+          brightness: ${red_led_brightness_presence_disabled}
+      - light.turn_on: 
+          id: light_red_led_right
+          brightness: ${red_led_brightness_presence_disabled}
+
+  - id: script_set_leds_lighting_not_required
+    then:
+      - light.turn_off: 
+          id: light_green_leds
+      - light.turn_off: 
+          id: light_red_led_left
+      - light.turn_off: 
+          id: light_red_led_right
+
+  - id: script_set_leds_nominal
+    then:
+      - light.turn_on: 
+          id: light_green_leds
+          brightness: ${green_led_brightness_nominal}
+      - light.turn_off: 
+          id: light_red_led_left
+      - light.turn_off: 
+          id: light_red_led_right
+
+  - id: script_update_leds
+    then:
+      if:
+        condition: 
+          switch.is_on: switch_direct_relay_control
+        then:
+          - script.execute: script_set_leds_direct_relay_control
+        else:
+          if:
+            condition:
+              binary_sensor.is_off: ha_sensor_presence_lighting
+            then:
+              - script.execute: script_set_leds_presence_disabled
+            else:
+               if:
+                condition:
+                  binary_sensor.is_off: ha_sensor_lighting_required
+                then:
+                  - script.execute: script_set_leds_lighting_not_required
+                else:
+                  - script.execute: script_set_leds_nominal
+
+  - id: script_toggle_presence_lighting
+    then:
+      - homeassistant.action:
+          action: input_boolean.toggle
+          data:
+            entity_id: ${entity_id_ha_helper_mode_presence_lighting}
+
+  - id: script_toggle_lighting_required
+    then:
+      - if:
+          condition:
+            binary_sensor.is_off: ha_sensor_presence_lighting
+          then:
+            - homeassistant.action:
+                action: input_boolean.turn_on
+                data:
+                  entity_id: ${entity_id_ha_helper_mode_presence_lighting}
+      - delay: 200ms
+      - homeassistant.action:
+          action: input_boolean.toggle
+          data:
+            entity_id: ${entity_id_ha_helper_mode_lighting_required}
+
+  - id: script_on_short_button_click
+    parameters:
+      right: bool
+    then:
+      if:
+        condition:
+          switch.is_on: switch_direct_relay_control
+        then:
+          lambda: "(right ? id(switch_relay_${right_button_relay}) : id(switch_relay_${left_button_relay}))->toggle();"
+        else:
+          - if: 
+              condition: 
+                - binary_sensor.is_off: button_sensor_both
+              then: 
+                script.execute: 
+                  id: script_action_ha_button_press
+                  entity_id: !lambda "return (right ? id(button_right_short) : id(button_left_short))->get_object_id();"
+        
+  - id: script_on_long_button_click
+    parameters:
+      right: bool
+    then:
+      if: 
+        condition: 
+          - switch.is_off: switch_direct_relay_control
+          - binary_sensor.is_off: button_sensor_both
+        then:
+          script.execute: 
+            id: script_action_ha_button_press
+            entity_id: !lambda "return (right ? id(button_right_long) : id(button_left_long))->get_object_id();"
+
 switch:
   - platform: template
     optimistic: true
-    name: "light_switch/${path}/${direct_relay_control_suffix}"
+    name: "${device_type}/${path}/${direct_relay_control_suffix}"
     id: switch_direct_relay_control
-    restore_mode: always_off
-    turn_on_action:
-      - light.turn_off: light_green_leds
-      - light.turn_on: light_red_led_left
-      - light.turn_on: light_red_led_right
-    turn_off_action:
-      - light.turn_on: 
-          id: light_green_leds
-          brightness: ${led_brightness}
-      - light.turn_off: light_red_led_left
-      - light.turn_off: light_red_led_right
+    restore_mode: always_on
+    on_turn_on: 
+      script.execute: script_update_leds
+    on_turn_off: 
+      script.execute: script_update_leds
   - platform: output
     name: "${relay_type}/${path}/${relay_1_suffix}"
     id: switch_relay_1
     output: output_relay_1
-    restore_mode: ${relay_1_restore_mode}
+    restore_mode: always_off
   - platform: output
     name: "${relay_type}/${path}/${relay_2_suffix}"
     id: switch_relay_2
     output: output_relay_2
-    restore_mode: ${relay_2_restore_mode}
+    restore_mode: always_off
 
 light:
   - platform: monochromatic
@@ -93,6 +223,19 @@ button:
     id: button_right_long
 
 binary_sensor:
+  - platform: homeassistant
+    id: ha_sensor_presence_lighting
+    entity_id: ${entity_id_ha_helper_mode_presence_lighting}
+    publish_initial_state: true
+    on_state:
+      script.execute: script_update_leds
+  - platform: homeassistant
+    id: ha_sensor_lighting_required
+    entity_id: ${entity_id_ha_helper_mode_lighting_required}
+    publish_initial_state: true
+    on_state:
+      script.execute: script_update_leds
+
   - platform: gpio
     id: button_sensor_left
     pin:
@@ -104,23 +247,19 @@ binary_sensor:
       - delayed_off: 10ms
     on_multi_click:
       - timing:
-          - ON for at most ${long_click_hold_time}
+        - ON for at most ${long_click_hold_time}
+        invalid_cooldown: 100ms
         then:
-          if: 
-            condition: 
-              switch.is_on: switch_direct_relay_control
-            then: 
-              switch.toggle: switch_relay_${left_button_relay}
-            else: 
-              !include { file: _action.ha_button_press.yaml, vars: { button_id: button_left_short } }
+          script.execute: 
+            id: script_on_short_button_click
+            right: false
       - timing: 
-          - ON for at least ${long_click_hold_time}
+        - ON for at least ${long_click_hold_time}
+        invalid_cooldown: 100ms
         then:
-          !include { file: _action.ha_button_press.yaml, vars: { button_id: button_left_long } }
-      - timing:
-          - ON for at least ${mode_swap_hold_time}
-        then:
-          switch.toggle: switch_direct_relay_control
+          script.execute: 
+            id: script_on_long_button_click
+            right: false
 
   - platform: gpio
     id: button_sensor_right
@@ -133,30 +272,45 @@ binary_sensor:
       - delayed_off: 10ms
     on_multi_click:
       - timing:
-          - ON for at most ${long_click_hold_time}
+        - ON for at most ${long_click_hold_time}
+        invalid_cooldown: 100ms
         then:
-          if: 
-            condition: 
-              switch.is_on: switch_direct_relay_control
-            then: 
-              switch.toggle: switch_relay_${right_button_relay}
-            else: 
-              !include { file: _action.ha_button_press.yaml, vars: { button_id: button_right_short } }
+          script.execute: 
+            id: script_on_short_button_click
+            right: true
       - timing: 
-          - ON for at least ${long_click_hold_time}
+        - ON for at least ${long_click_hold_time}
+        invalid_cooldown: 100ms
         then:
-          !include { file: _action.ha_button_press.yaml, vars: { button_id: button_right_long } }
+          script.execute: 
+            id: script_on_long_button_click
+            right: true
+  
+  - platform: template
+    id: button_sensor_both
+    lambda: "return id(button_sensor_left).state && id(button_sensor_right).state;"
+    filters:
+      - delayed_off: 100ms
+    on_multi_click:
+      - timing: 
+        - ON for at least ${long_click_hold_time}
+        invalid_cooldown: 100ms
+        then:
+          if:
+            condition:
+              switch.is_off: switch_direct_relay_control
+            then:
+              script.execute: script_toggle_presence_lighting
+            else:
+              switch.toggle: switch_direct_relay_control
+      - timing: 
+        - ON for at least ${toggle_lighting_required_hold_time}
+        invalid_cooldown: 100ms
+        then:
+          script.execute: script_toggle_lighting_required
       - timing:
-          - ON for at least ${mode_swap_hold_time}
+        - ON for at least ${toggle_direct_relay_control_hold_time}
+        invalid_cooldown: 100ms
         then:
-          switch.toggle: switch_direct_relay_control
-      
-  - platform: status
-    name: "light_switch/${path}/status"
-    
-sensor:
-  - platform: wifi_signal
-    name: "WiFi signal"
-    update_interval: 60s
-  - platform: uptime
-    name: "light_switch/${path}/uptime"
+          - switch.toggle: switch_direct_relay_control
+          - script.execute: script_toggle_lighting_required

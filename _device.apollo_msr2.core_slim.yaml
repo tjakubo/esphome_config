@@ -1,0 +1,201 @@
+defaults:
+  entity_id_ha_helper_mode_sleeping: "input_boolean.helper_dummy_always_off"
+
+substitutions:
+  device_type: "apollo"  
+
+packages:
+  sensors_diagnostic_common: !include _sensors.diagnostic.common.yaml
+  sensors_diagnostic_esp32: !include _sensors.diagnostic.esp32.yaml
+
+api:
+  services:
+    - service: rtttl_play_with_gain
+      variables:
+        tone: string
+        gain: int
+      then:
+        - rtttl.stop
+        - lambda: |-
+            id(rtttl_component)->set_gain((100-(gain/10.0f))/100.0f);
+        - rtttl.play: !lambda return tone;
+        - wait_until:
+            condition:
+              - not:
+                  - rtttl.is_playing
+
+output:
+  - platform: ledc
+    pin: GPIO10
+    id: buzzer
+
+rtttl:
+  id: rtttl_component
+  output: buzzer
+
+number:
+  - platform: template
+    id: number_target_led_brightness
+    min_value: 0
+    max_value: 1
+    initial_value: 0
+    step: 0.01
+    optimistic: true
+  - platform: template
+    id: number_target_led_red
+    min_value: 0
+    max_value: 1
+    initial_value: 0
+    step: 0.01
+    optimistic: true
+  - platform: template
+    id: number_target_led_green
+    min_value: 0
+    max_value: 1
+    initial_value: 0
+    step: 0.01
+    optimistic: true
+  - platform: template
+    id: number_target_led_blue
+    min_value: 0
+    max_value: 1
+    initial_value: 0
+    step: 0.01
+    optimistic: true
+
+binary_sensor:
+  - platform: homeassistant
+    id: ha_sensor_mode_sleeping
+    entity_id: ${entity_id_ha_helper_mode_sleeping}
+    publish_initial_state: true
+
+sensor:
+  - platform: scd4x
+    co2:
+      name: "co2/${path}"
+      id: sensor_co2
+    automatic_self_calibration: false
+    update_interval: 60s
+    measurement_mode: "periodic"
+    i2c_id: bus_a
+    ambient_pressure_compensation_source: dps310_pressure
+  
+  - platform: dps310
+    pressure:
+      name: "${device_type}/${path}/dps310/pressure"
+      id: dps310_pressure
+    temperature:
+      id: dps310_temperature
+    update_interval: 30s
+    i2c_id: bus_a
+
+  - platform: copy
+    source_id: sensor_co2
+    id: sensor_co2_light
+    on_value: 
+      then:
+        lambda: |-
+            auto set_state_and_effect = [](float brightness, float red, float green, float blue, std::string effect) {
+              static esphome::optional<std::string> active_effect = esphome::nullopt;
+              id(number_target_led_brightness).make_call().set_value(brightness).perform();
+              id(number_target_led_red).make_call().set_value(red).perform();
+              id(number_target_led_green).make_call().set_value(green).perform();
+              id(number_target_led_blue).make_call().set_value(blue).perform();
+              if (active_effect == effect) {
+                return;
+              }
+              active_effect = effect;
+              id(light_led).turn_on().set_effect(std::move(effect)).perform();
+            };
+            const auto base_brightness = 0.3;
+            const auto top_brightness = 0.6;
+            const auto linear_transition = [](float value, float from, float to) {
+              const auto over = to - from;
+              return std::min(1.0f, std::max(0.0f, (value-from)/over));
+            };
+            auto sleeping = id(ha_sensor_mode_sleeping).state;
+            if (sleeping) {
+              set_state_and_effect(0.0, 0.0, 0.0, 0.0, std::string{ "Nominal Effect" });
+            }
+            else if (x < 500) {
+              auto green = linear_transition(x, 500, 300);
+              set_state_and_effect(base_brightness, 0.0, green, 1.0, std::string{ "Nominal Effect" });
+            }
+            else if (x < 1000) {
+              auto red = linear_transition(x, 500, 1000);
+              set_state_and_effect(base_brightness, red, 0.0, 1.0, std::string{ "Nominal Effect" });
+            }
+            else if (x < 1500) {
+              auto blue = linear_transition(x, 1500, 1000);
+              set_state_and_effect(base_brightness, 1.0, 0.0, blue, std::string{ "Nominal Effect" });
+            }
+            else {
+              auto [brightness, effect] = [&] {                
+                auto brightness = base_brightness + linear_transition(x, 1500, 2000)*(top_brightness-base_brightness);
+                return std::tuple{ brightness, std::string{ x < 2000 ? "Warning Effect" : "Alert Effect" } };
+              }();
+              set_state_and_effect(brightness, 1.0, 0.0, 0.0, effect);
+            }
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: light_led
+    pin: GPIO3
+    default_transition_length: 0s
+    chipset: WS2812
+    num_leds: 3
+    rgb_order: grb
+    effects:
+      - lambda:
+          name: "Nominal Effect"
+          update_interval: 60s
+          lambda: |-
+            auto brightness = id(number_target_led_brightness).state;
+            auto red = id(number_target_led_red).state;
+            auto green = id(number_target_led_green).state;
+            auto blue = id(number_target_led_blue).state;
+            id(light_led).turn_on().set_brightness(brightness).set_rgb(red, green, blue).set_transition_length(5000).perform();
+      - lambda:
+          name: "Warning Effect"
+          update_interval: 1500ms
+          lambda: |-
+            static int phase = 0;
+            const auto phases_count = 2;
+            if (initial_run || phase >= phases_count) {
+              phase = 0;
+            };
+            auto brightness = phase == 0 ? 0.3 : id(number_target_led_brightness).state;
+            auto red = id(number_target_led_red).state;
+            auto green = id(number_target_led_green).state;
+            auto blue = id(number_target_led_blue).state;
+            id(light_led).turn_on().set_brightness(brightness).set_rgb(red, green, blue).set_transition_length(1500).perform();
+            ++phase;
+      - lambda:
+          name: "Alert Effect"
+          update_interval: 1500ms
+          lambda: |-
+            static int phase = 0;
+            const auto phases_count = 2;
+            if (initial_run || phase >= phases_count) {
+              phase = 0;
+            };
+            auto brightness = phase == 0 ? 0.01 : id(number_target_led_brightness).state;
+            auto red = id(number_target_led_red).state;
+            auto green = id(number_target_led_green).state;
+            auto blue = id(number_target_led_blue).state;
+            id(light_led).turn_on().set_brightness(brightness).set_rgb(red, green, blue).set_transition_length(1500).perform();
+            ++phase;
+
+button:
+  - platform: restart
+    icon: mdi:power-cycle
+    name: "${device_type}/${path}/reboot"
+
+  - platform: factory_reset
+    disabled_by_default: true
+    name: "${device_type}/${path}/factory_reset"
+
+switch:
+  - platform: factory_reset
+    id: switch_factory_reset
+    internal: true

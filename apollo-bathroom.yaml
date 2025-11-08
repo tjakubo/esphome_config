@@ -1,6 +1,6 @@
 substitutions:
-  path: "office"
-  hostname: "apollo-office"
+  path: "bathroom"
+  hostname: "apollo-bathroom"
 
 packages:
   hardware: !include _hardware.apollo_msr2.yaml

@@ -1,0 +1,7 @@
+substitutions:
+  path: "office"
+  hostname: "athom-office"
+
+packages:
+  hardware: !include _hardware.athom_ps.yaml
+  device: !include _device.athom_ps.core_slim.yaml

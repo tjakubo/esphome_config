@@ -1,0 +1,53 @@
+defaults: 
+  channel_1_light_name: "unused_1"
+  channel_1_internal: "true"
+  channel_2_light_name: "unused_2"
+  channel_2_internal: "true"
+  channel_3_light_name: "unused_3"
+  channel_3_internal: "true"
+  channel_4_light_name: "unused_4"
+  channel_4_internal: "true"
+  pwm_frequency: "1000 Hz"
+
+substitutions:
+  device_type: "light"
+
+light:
+  - platform: monochromatic
+    name: "${device_type}/${path}/${channel_1_light_name}"
+    id: light_channel_1
+    output: output_channel_1
+    internal: ${channel_1_internal}
+  - platform: monochromatic
+    name: "${device_type}/${path}/${channel_2_light_name}"
+    id: light_channel_2
+    output: output_channel_2
+    internal: ${channel_2_internal}
+  - platform: monochromatic
+    name: "${device_type}/${path}/${channel_3_light_name}"
+    id: light_channel_3
+    output: output_channel_3
+    internal: ${channel_3_internal}
+  - platform: monochromatic
+    name: "${device_type}/${path}/${channel_4_light_name}"
+    id: light_channel_4
+    output: output_channel_4
+    internal: ${channel_4_internal}
+
+output:
+  - platform: esp8266_pwm
+    id: output_channel_1
+    pin: GPIO12
+    frequency: ${pwm_frequency}
+  - platform: esp8266_pwm
+    id: output_channel_2
+    pin: GPIO15
+    frequency: ${pwm_frequency}
+  - platform: esp8266_pwm
+    id: output_channel_3
+    pin: GPIO14
+    frequency: ${pwm_frequency}
+  - platform: esp8266_pwm
+    id: output_channel_4
+    pin: GPIO4
+    frequency: ${pwm_frequency}

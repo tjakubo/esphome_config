@@ -35,6 +35,9 @@ wifi:
     password: !secret fallback_wifi_password
   power_save_mode: LIGHT
 
+network:
+  enable_ipv6: false
+
 web_server:
   port: 80
 

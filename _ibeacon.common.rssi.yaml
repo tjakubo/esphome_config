@@ -1,6 +1,34 @@
+binary_sensor:
+  - platform: ble_presence
+    ibeacon_uuid: ${ibeacon_uuid}
+    ibeacon_major: ${ibeacon_major}
+    ibeacon_minor: ${ibeacon_minor}
+    id: internal_presence_for_rssi_${path}_${name}
+    timeout: 120s
+
 sensor:
   - platform: ble_rssi
-    ibeacon_uuid: ${uuid}
-    ibeacon_major: ${major}
-    ibeacon_minor: ${minor}
+    ibeacon_uuid: ${ibeacon_uuid}
+    ibeacon_major: ${ibeacon_major}
+    ibeacon_minor: ${ibeacon_minor}
     name: "ble/${path}/${name}/rssi"
+    id: "ble_${path}_${name}_rssi"
+    filters:
+    - timeout: 
+        timeout: 45s
+        value: !lambda id(ble_${path}_${name}_rssi).publish_state(0); return 1;
+    - filter_out: 1
+    - lambda: |-
+        if (x >= 0 && !id(internal_presence_for_rssi_${path}_${name}).state) return -200;
+        else if (x >= 0) return {};
+        return x;
+    - sliding_window_moving_average:
+        window_size: 10
+        send_every: 1
+    - lambda: |-
+        static float last_x = -100;
+        if (!isnan(x) && x < -100) x = -100;
+        if (x <= -100 && (last_x <= -100 || isnan(last_x))) x = NAN;
+        if (isnan(x) && isnan(last_x)) return {};
+        last_x = x;
+        return x;

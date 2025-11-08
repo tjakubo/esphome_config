@@ -24,4 +24,7 @@ wifi:
     password: !secret fallback_wifi_password
   power_save_mode: HIGH # for ESP8266 LOW/HIGH are mixed up, esphome/issues/issues/1532
 
+network:
+  enable_ipv6: false  
+
 logger:

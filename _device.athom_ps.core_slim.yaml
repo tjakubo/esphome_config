@@ -1,0 +1,357 @@
+substitutions:
+  device_type: "athom"
+
+packages:
+  sensors_diagnostic_common: !include _sensors.diagnostic.common.yaml
+  sensors_diagnostic_esp32: !include _sensors.diagnostic.esp32.yaml
+
+light:
+  - platform: status_led
+    id: led
+    pin: GPIO2
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO3
+      mode:
+        input: true
+        pullup: true
+    name: "pir/${path}"
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 500ms
+    device_class: motion
+    
+  - platform: gpio
+    pin:
+      number: GPIO4
+      mode:
+        input: true
+        pullup: true
+    name: "mmwave/${path}"
+    filters:
+      - delayed_on: 50ms
+    device_class: motion
+    on_press:
+      then:
+        - if:
+            condition:
+              switch.is_on: switch_mmwave_light
+            then:
+              - light.turn_on: led
+    on_release:
+      then:
+        - if:
+            condition:
+              switch.is_on: switch_mmwave_light
+            then:
+              - light.turn_off: led
+
+  - platform: template
+    name: "${device_type}/${path}/processing_command"
+    id: sensor_mmwave_processing_command
+    entity_category: config
+
+#sensor:
+  #- platform: bh1750
+  #  name: "Light Sensor"
+  #  address: 0x23
+  #  update_interval: 5s
+
+script:
+  - id: script_partial_mmwave_set_started_processing
+    then:
+      - binary_sensor.template.publish:
+          id: sensor_mmwave_processing_command
+          state: on
+  - id: script_partial_mmwave_set_done_processing
+    then:
+      - binary_sensor.template.publish:
+          id: sensor_mmwave_processing_command
+          state: off
+  - id: script_partial_mmwave_stop
+    then:
+      - uart.write: "sensorStop\r\n"
+  - id: script_partial_mmwave_start
+    then:
+      - uart.write: "sensorStart\r\n"
+  - id: script_partial_mmwave_save_config
+    then:
+      - uart.write: "saveConfig\r\n"
+  - id: script_partial_mmwave_reset_config
+    then:
+      - uart.write: "resetCfg\r\n"
+  - id: script_partial_mmwave_restart
+    then:
+      - uart.write: "resetSystem\r\n"
+  - id: script_partial_mmwave_set_ranges
+    then:
+      - uart.write: !lambda |-
+          std::string command = "setRange " + str_sprintf("%.1f", id(number_mmwave_range_min).state) + " " + str_sprintf("%.1f", id(number_mmwave_range_max).state) + "\r\n";
+          return std::vector<uint8_t>(command.begin(), command.end());
+  - id: script_partial_mmwave_set_sensitivities
+    then:
+      - uart.write: !lambda |-
+          std::string command = "setSensitivity " + str_sprintf("%.0f", id(number_mmwave_maintain_sensitivity).state) + " " + str_sprintf("%.0f", id(number_mmwave_trigger_sensitivity).state) + "\r\n";
+          return std::vector<uint8_t>(command.begin(), command.end());
+  - id: script_partial_mmwave_set_latencies
+    then:
+      - uart.write: !lambda |-
+          std::string command = "setLatency " + str_sprintf("%.1f", id(number_mmwave_enter_latency).state) + " " + str_sprintf("%.0f", id(number_mmwave_exit_latency).state) + "\r\n";
+          return std::vector<uint8_t>(command.begin(),command.end());
+  - id: script_partial_mmwave_set_inhibit_time
+    then:
+      - uart.write: !lambda |-
+          std::string command = "setInhibit " + str_sprintf("%.0f", id(number_mmwave_inhibit_time).state) + "\r\n";
+          return std::vector<uint8_t>(command.begin(), command.end());
+
+  - id: script_mmwave_reset_config
+    then:
+      - wait_until:
+          condition:
+            binary_sensor.is_off: sensor_mmwave_processing_command
+      - script.execute: script_partial_mmwave_set_started_processing
+      - script.execute: script_partial_mmwave_stop
+      - delay: 1s
+      - script.execute: script_partial_mmwave_reset_config
+      - delay: 1s
+      - script.execute: script_partial_mmwave_start
+      - script.execute: script_partial_mmwave_set_done_processing
+
+  - id: script_mmwave_set_ranges
+    then:
+      if:
+        condition:
+          lambda: !lambda "return id(number_mmwave_range_min).state < id(number_mmwave_range_max).state;"
+        then:
+          - wait_until:
+              condition:
+                binary_sensor.is_off: sensor_mmwave_processing_command
+          - script.execute: script_partial_mmwave_set_started_processing
+          - script.execute: script_partial_mmwave_stop
+          - delay: 1s
+          - script.execute: script_partial_mmwave_set_ranges
+          - delay: 500ms
+          - script.execute: script_partial_mmwave_save_config
+          - delay: 500ms
+          - script.execute: script_partial_mmwave_start
+          - script.execute: script_partial_mmwave_set_done_processing
+
+  - id: script_mmwave_set_sensitivities
+    then:
+      - wait_until:
+          condition:
+            binary_sensor.is_off: sensor_mmwave_processing_command
+      - script.execute: script_partial_mmwave_set_started_processing
+      - script.execute: script_partial_mmwave_stop
+      - delay: 1s
+      - script.execute: script_partial_mmwave_set_sensitivities
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_save_config
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_start
+      - script.execute: script_partial_mmwave_set_done_processing
+
+  - id: script_mmwave_set_latencies
+    then:
+      - wait_until:
+          condition:
+            binary_sensor.is_off: sensor_mmwave_processing_command
+      - script.execute: script_partial_mmwave_set_started_processing
+      - script.execute: script_partial_mmwave_stop
+      - delay: 1s
+      - script.execute: script_partial_mmwave_set_latencies
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_save_config
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_start
+      - script.execute: script_partial_mmwave_set_done_processing
+
+  - id: script_mmwave_set_inhibit_time
+    then:
+      - wait_until:
+          condition:
+            binary_sensor.is_off: sensor_mmwave_processing_command
+      - script.execute: script_partial_mmwave_set_started_processing
+      - script.execute: script_partial_mmwave_stop
+      - delay: 1s
+      - script.execute: script_partial_mmwave_set_inhibit_time
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_save_config
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_start
+      - script.execute: script_partial_mmwave_set_done_processing
+
+  - id: script_mmwave_set_all_config_values
+    then:
+      - wait_until:
+          condition:
+            binary_sensor.is_off: sensor_mmwave_processing_command
+      - script.execute: script_partial_mmwave_set_started_processing
+      - script.execute: script_partial_mmwave_stop
+      - delay: 1s
+      - script.execute: script_partial_mmwave_set_ranges
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_set_sensitivities
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_set_latencies
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_set_inhibit_time
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_save_config
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_start
+      - script.execute: script_partial_mmwave_set_done_processing
+
+  - id: script_mmwave_restart
+    then:
+      - wait_until:
+          condition:
+            binary_sensor.is_off: sensor_mmwave_processing_command
+      - script.execute: script_partial_mmwave_set_started_processing
+      - script.execute: script_partial_mmwave_restart
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_set_done_processing
+
+switch:
+  - platform: template
+    name: "${device_type}/${path}/presence_light"
+    id: switch_mmwave_light
+    optimistic: true
+    restore_mode: restore_default_on
+    entity_category: config
+    on_turn_on:
+      - light.turn_on: led
+    on_turn_off:
+      - light.turn_off: led
+
+number:
+  - platform: template
+    name: "${device_type}/${path}/param/range_min"
+    id: number_mmwave_range_min
+    min_value: 1.8
+    max_value: 6
+    step: 0.1
+    initial_value: 1.8
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: m
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_ranges
+
+  - platform: template
+    name: "${device_type}/${path}/param/range_max"
+    id: number_mmwave_range_max
+    min_value: 1.9
+    max_value: 12
+    step: 0.1
+    initial_value: 6
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: m
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_ranges
+
+  - platform: template
+    name: "${device_type}/${path}/param/maintain_sensitivity"
+    id: number_mmwave_maintain_sensitivity
+    min_value: 0
+    max_value: 9
+    step: 1
+    initial_value: 7
+    optimistic: true
+    restore_value: true
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_sensitivities
+
+  - platform: template
+    name: "${device_type}/${path}/param/trigger_sensitivity"
+    id: number_mmwave_trigger_sensitivity
+    min_value: 0
+    max_value: 9
+    step: 1
+    initial_value: 5
+    optimistic: true
+    restore_value: true
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_sensitivities
+
+  - platform: template
+    name: "${device_type}/${path}/param/enter_latency"
+    id: number_mmwave_enter_latency
+    min_value: 0.1
+    max_value: 60
+    step: 0.1
+    initial_value: 0.1
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: seconds
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_latencies
+
+  - platform: template
+    name: "${device_type}/${path}/param/exit_latency"
+    id: number_mmwave_exit_latency
+    min_value: 1
+    max_value: 300
+    step: 1
+    initial_value: 15
+    optimistic: true    
+    restore_value: true
+    unit_of_measurement: seconds
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_latencies
+
+  - platform: template
+    name: "${device_type}/${path}/param/inhibit_time"
+    id: number_mmwave_inhibit_time
+    min_value: 1
+    max_value: 255
+    step: 1
+    initial_value: 1
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: seconds
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_inhibit_time
+
+button:
+  - platform: template
+    name: "${device_type}/${path}/param/reset_all"
+    id: button_mmwave_param_reset_all
+    entity_category: config
+    on_press:
+      - script.execute: script_mmwave_reset_config
+
+  - platform: template
+    name: "${device_type}/${path}/param/save_all"
+    id: button_mmwave_param_save_all
+    entity_category: config
+    on_press:
+      - script.execute: script_mmwave_set_all_config_values
+
+  - platform: restart
+    id: button_restart_esp
+
+  - platform: template
+    name: "${device_type}/${path}/param/restart"
+    id: button_mmwave_restart
+    entity_category: config
+    on_press:
+      - script.execute: script_mmwave_restart
+      - button.press: button_restart_esp

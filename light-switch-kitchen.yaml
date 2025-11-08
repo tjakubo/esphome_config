@@ -1,13 +1,14 @@
 substitutions:
   path: "kitchen"
+  mode_id_path: "kitchen"
   hostname: "light-switch-kitchen"
-  relay_1_suffix: "spot"
-  relay_2_suffix: "center"
 
 packages:
   hardware: !include _hardware.esp8266.yaml
   device: !include 
     file: _device.gosund_sw9.yaml
     vars: 
+      relay_1_suffix: "spot"
+      relay_2_suffix: "center"
       left_button_relay: "2"
       right_button_relay: "1"

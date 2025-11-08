@@ -1,13 +1,14 @@
 substitutions:
   path: "hallway/middle"
+  mode_id_path: "hallway"
   hostname: "light-switch-hallway-middle"
-  relay_1_suffix: "unused_1"
-  relay_2_suffix: "unused_2"
 
 packages:
   hardware: !include _hardware.esp8266.yaml
   device: !include 
     file: _device.gosund_sw9.yaml
     vars: 
+      relay_1_suffix: "unused_1"
+      relay_2_suffix: "unused_2"
       relay_1_restore_mode: always_off
       relay_2_restore_mode: always_off
