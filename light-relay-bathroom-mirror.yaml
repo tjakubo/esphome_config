@@ -1,0 +1,10 @@
+substitutions:
+  path: "bathroom/mirror"
+  hostname: "light-relay-bathroom-mirror"
+
+packages:
+  hardware: !include 
+    file: _hardware.esp8266.yaml
+    vars:       
+      board: "esp8285"
+  device: !include _device.sonoff_minir2_relay_only.yaml

@@ -1,0 +1,9 @@
+switch:
+  - id: !extend switch_direct_relay_control
+    internal: true
+    optimistic: false
+    restore_mode: always_off
+    turn_on_action:
+      lambda: ""
+    turn_off_action:
+      lambda: ""

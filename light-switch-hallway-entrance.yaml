@@ -10,4 +10,5 @@ packages:
     vars: 
       relay_1_suffix: "strip"
       relay_2_suffix: "center"
-      relay_2_restore_mode: always_off
+      left_button_relay: "1"
+      right_button_relay: "1"

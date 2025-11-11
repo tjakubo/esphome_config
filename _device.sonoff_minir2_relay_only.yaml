@@ -1,0 +1,35 @@
+defaults: 
+  relay_type: "light_relay"
+
+substitutions:
+  device_type: "light_switch"
+
+packages:
+  action_ha_button_press: !include _action.ha_button_press.yaml
+  sensors_diagnostic_common: !include _sensors.diagnostic.common.yaml
+
+api:
+  reboot_timeout: 0s
+
+output:
+  - platform: gpio
+    id: output_relay
+    pin: GPIO12
+
+switch:
+  - platform: output
+    name: "${relay_type}/${path}"
+    id: switch_relay
+    output: output_relay
+    restore_mode: always_off
+
+binary_sensor:
+  - platform: gpio
+    id: button_sensor_left
+    pin: GPIO04
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_state:
+      then:
+        switch.toggle: switch_relay

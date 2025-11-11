@@ -10,5 +10,4 @@ packages:
     vars: 
       relay_1_suffix: "unused_1"
       relay_2_suffix: "unused_2"
-      relay_1_restore_mode: always_off
-      relay_2_restore_mode: always_off
+  remove_direct_relay_control: !include _feature.gosund_sw9.remove_direct_relay_control.yaml

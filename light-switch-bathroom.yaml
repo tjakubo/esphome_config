@@ -12,4 +12,3 @@ packages:
       relay_2_suffix: "unused"
       left_button_relay: "1"
       right_button_relay: "1"
-      relay_2_restore_mode: always_off
