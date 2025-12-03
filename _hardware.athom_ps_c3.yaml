@@ -11,6 +11,32 @@ esp32:
   framework:
     type: esp-idf
 
+light:
+  - platform: status_led
+    id: light_led
+    pin: GPIO2
+
+binary_sensor:
+  - platform: gpio
+    pin: 
+      number: GPIO3
+      mode:
+        input: true
+        pullup: true
+    id: binary_sensor_pir
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 500ms
+  - platform: gpio
+    pin:
+      number: GPIO4
+      mode:
+        input: true
+        pullup: true
+    id: binary_sensor_mmwave
+    filters:
+      - delayed_on: 50ms
+
 i2c:
   sda: GPIO18
   scl: GPIO19
@@ -20,13 +46,6 @@ uart:
   tx_pin: GPIO8
   rx_pin: GPIO5
   baud_rate: 115200
-  #debug:
-  #  direction: BOTH
-  #  dummy_receiver: true
-  #  after:
-  #    delimiter: "\n"
-  #  sequence:
-  #    - lambda: UARTDebug::log_string(direction, bytes);
 
 api:
   encryption:

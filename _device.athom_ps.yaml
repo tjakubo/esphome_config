@@ -1,0 +1,483 @@
+substitutions:
+  device_type: "athom"
+
+packages:
+  sensors_diagnostic_common: !include _sensors.diagnostic.common.yaml
+
+binary_sensor:
+  - platform: copy
+    id: binary_sensor_abstract_pir
+    source_id: binary_sensor_pir
+    name: "pir/${path}"
+    device_class: motion
+    
+  - platform: copy
+    id: binary_sensor_abstract_mmwave
+    source_id: binary_sensor_mmwave
+    name: "mmwave/${path}"
+    device_class: motion
+    on_state:
+      then:
+        script.execute: script_update_led
+
+  - platform: template
+    name: "${device_type}/${path}/processing_command"
+    id: binary_sensor_mmwave_processing_command
+    entity_category: config
+
+sensor:
+  - platform: bh1750
+    name: "${device_type}/${path}/lux"
+    address: 0x23
+    update_interval: 30s
+  - platform: template
+    name: "${device_type}/${path}/param/range_min/reported"
+    id: sensor_mmwave_range_min_reported
+    entity_category: diagnostic
+  - platform: template
+    name: "${device_type}/${path}/param/range_max/reported"
+    id: sensor_mmwave_range_max_reported
+    entity_category: diagnostic
+  - platform: template
+    name: "${device_type}/${path}/param/maintain_sensitivity/reported"
+    id: sensor_mmwave_maintain_sensitivity_reported
+    entity_category: diagnostic
+  - platform: template
+    name: "${device_type}/${path}/param/trigger_sensitivity/reported"
+    id: sensor_mmwave_trigger_sensitivity_reported
+    entity_category: diagnostic
+  - platform: template
+    name: "${device_type}/${path}/param/enter_latency/reported"
+    id: sensor_mmwave_enter_latency_reported
+    entity_category: diagnostic
+  - platform: template
+    name: "${device_type}/${path}/param/exit_latency/reported"
+    id: sensor_mmwave_exit_latency_reported
+    entity_category: diagnostic
+  - platform: template
+    name: "${device_type}/${path}/param/inhibit_time/reported"
+    id: sensor_mmwave_inhibit_time_reported
+    entity_category: diagnostic
+  - platform: template
+    name: "mmwave/${path}/distance"
+    id: sensor_mmwave_distance
+    state_class: measurement
+    filters: 
+      - exponential_moving_average:
+          send_every: 1
+      - delta: 0.1
+  - platform: template
+    name: "mmwave/${path}/snr"
+    id: sensor_mmwave_snr
+    state_class: measurement
+    filters: 
+      - exponential_moving_average:
+          send_every: 1
+      - delta: 1
+
+globals:
+  - id: global_queried_param_type
+    type: "char"
+    initial_value: '0'
+    restore_value: no
+
+uart:
+  debug:
+    direction: BOTH
+    dummy_receiver: true
+    after:
+      delimiter: "\n"
+    sequence:
+      - lambda: |-
+          if (bytes[0] != '$')
+            UARTDebug::log_string(direction, bytes);
+      - lambda: |-
+          const std::string line(bytes.begin(), bytes.end());
+          constexpr auto StartsWith{ [](const std::string& str, const char* piece) {
+            return str.rfind(piece, 0) == 0;
+          } };
+          if (StartsWith(line, "Response") && id(global_queried_param_type) != 0)
+          {
+            constexpr auto FirstIndex{ 9 };
+            constexpr auto ExtractBody{ [](const std::string& line) -> optional<std::string> {
+              if (const auto endIndex{ line.find('\r', FirstIndex) }; endIndex > FirstIndex)
+                return line.substr(FirstIndex, endIndex - FirstIndex);
+              else
+                return nullopt;  
+            } };
+            constexpr auto ParseOneNumber{ [ExtractBody](const std::string& line) -> optional<float> {
+              const auto body{ ExtractBody(line) };
+              if (!body.has_value())
+                return nullopt;
+
+              return parse_number<float>(*body);
+            } };
+            constexpr auto ParseTwoNumbers{ [ExtractBody](const std::string& line) -> optional<std::pair<float, float>> {
+              const auto body{ ExtractBody(line) };
+              if (!body.has_value())
+                return nullopt;
+
+              const auto splitIndex{ body->find(' ') };
+              if (splitIndex < 0)
+                return nullopt;
+
+              const auto firstNumber{ parse_number<float>(body->substr(0, splitIndex)) };
+              const auto secondNumber{ parse_number<float>(body->substr(splitIndex)) };
+              if (!firstNumber.has_value() || !secondNumber.has_value())
+                return nullopt;
+
+              return std::pair{ *firstNumber, *secondNumber };
+            } };
+            const auto param_type{ id(global_queried_param_type) };
+            switch (param_type)
+            {
+              case 'R':
+              case 'S':
+              case 'L':
+              {
+                const auto numbers{ ParseTwoNumbers(line) };
+                if (!numbers.has_value())
+                  break;
+
+                if (param_type == 'R')
+                {
+                  id(sensor_mmwave_range_min_reported).publish_state(numbers->first);
+                  id(sensor_mmwave_range_max_reported).publish_state(numbers->second);
+                }
+                else if (param_type == 'S')
+                {
+                  id(sensor_mmwave_maintain_sensitivity_reported).publish_state(numbers->first);
+                  id(sensor_mmwave_trigger_sensitivity_reported).publish_state(numbers->second);
+                }
+                else if (param_type == 'L')
+                {
+                  id(sensor_mmwave_enter_latency_reported).publish_state(numbers->first);
+                  id(sensor_mmwave_exit_latency_reported).publish_state(numbers->second);
+                }
+                break;
+              }
+              case 'I':
+              {
+                const auto number{ ParseOneNumber(line) };
+                if (number.has_value())
+                  id(sensor_mmwave_inhibit_time_reported).publish_state(*number);
+
+                break;
+              }
+            }
+          }
+          else if (StartsWith(line, "$""JYRPO"))
+          {
+            constexpr auto DistanceStartIndex{ 11 };
+            const auto DistanceEndIndex{ line.find(", ,", DistanceStartIndex)  };
+            const auto snrStartIndex{ DistanceEndIndex + 3 };
+            const auto snrEndIndex{ line.find(',', snrStartIndex) };
+            if (DistanceEndIndex > DistanceStartIndex && snrStartIndex > DistanceEndIndex && snrEndIndex > snrStartIndex)
+            {
+              const auto distance{ parse_number<float>(line.substr(DistanceStartIndex, DistanceEndIndex - DistanceStartIndex)) };
+              const auto snr{ parse_number<float>(line.substr(snrStartIndex, snrEndIndex - snrStartIndex)) };
+              if (distance.has_value() && snr.has_value())
+              {
+                id(sensor_mmwave_distance).publish_state(*distance);
+                id(sensor_mmwave_snr).publish_state(*snr);
+              }
+            }
+          }
+          else if (StartsWith(line, "get"))
+          {
+            id(global_queried_param_type) = line[3];
+          }
+          else if (!StartsWith(line, "Done"))
+          {
+            id(global_queried_param_type) = 0;
+          }
+
+script:
+  - id: script_update_led
+    then:
+      if:
+        condition:
+          - switch.is_on: switch_mmwave_light
+          - binary_sensor.is_on: binary_sensor_mmwave
+        then:
+          light.turn_on: light_led
+        else:
+          light.turn_off: light_led
+
+  - id: script_partial_mmwave_set_started_processing
+    then:
+      - binary_sensor.template.publish:
+          id: binary_sensor_mmwave_processing_command
+          state: on
+
+  - id: script_partial_mmwave_set_done_processing
+    then:
+      - binary_sensor.template.publish:
+          id: binary_sensor_mmwave_processing_command
+          state: off
+          
+  - id: script_mmwave_pre_set
+    then:
+      - wait_until:
+          condition:
+            binary_sensor.is_off: binary_sensor_mmwave_processing_command
+      - script.execute: script_partial_mmwave_set_started_processing
+      - uart.write: "sensorStop\r\n"
+      - delay: 1s
+
+  - id: script_mmwave_post_set
+    then:
+      - delay: 500ms
+      - uart.write: "saveConfig\r\n"
+      - delay: 500ms
+      - uart.write: "sensorStart\r\n"
+      - script.execute: script_partial_mmwave_set_done_processing
+
+  - id: script_mmwave_get_all_params
+    then:
+      - wait_until:
+          condition:
+            binary_sensor.is_off: binary_sensor_mmwave_processing_command
+      - script.execute: script_partial_mmwave_set_started_processing
+      - uart.write: "getRange\r\n"
+      - delay: 500ms
+      - uart.write: "getSensitivity\r\n"
+      - delay: 500ms
+      - uart.write: "getLatency\r\n"
+      - delay: 500ms
+      - uart.write: "getInhibit\r\n"
+      - delay: 500ms
+      - script.execute: script_partial_mmwave_set_done_processing
+
+  - id: script_mmwave_reset_config
+    then:
+      - script.execute: script_mmwave_pre_set
+      - script.wait: script_mmwave_pre_set
+      - uart.write: "resetCfg\r\n"
+      - script.execute: script_mmwave_post_set
+      - script.wait: script_mmwave_post_set
+      - script.execute: script_mmwave_get_all_params
+      - script.wait: script_mmwave_get_all_params
+
+  - id: script_mmwave_setup_output
+    then:
+      - script.execute: script_mmwave_pre_set
+      - script.wait: script_mmwave_pre_set
+      - uart.write: "setEcho 0\r\n"
+      - delay: 500ms
+      - uart.write: "setUartOutput 1 0\r\n"
+      - delay: 500ms
+      - uart.write: "setUartOutput 2 1\r\n"
+      - script.execute: script_mmwave_post_set
+      - script.wait: script_mmwave_post_set
+
+  - id: script_mmwave_set_ranges
+    then:
+      if:
+        condition:
+          lambda: !lambda "return id(number_mmwave_range_min).state < id(number_mmwave_range_max).state;"
+        then:
+          - script.execute: script_mmwave_pre_set
+          - script.wait: script_mmwave_pre_set
+          - uart.write: !lambda |-
+              std::string command = "setRange " + str_sprintf("%.1f", id(number_mmwave_range_min).state) + " " + str_sprintf("%.1f", id(number_mmwave_range_max).state) + "\r\n";
+              return std::vector<uint8_t>(command.begin(), command.end());
+          - script.execute: script_mmwave_post_set
+          - script.wait: script_mmwave_post_set
+          - uart.write: "getRange\r\n"
+
+  - id: script_mmwave_set_sensitivities
+    then:
+      - script.execute: script_mmwave_pre_set
+      - script.wait: script_mmwave_pre_set
+      - uart.write: !lambda |-
+          std::string command = "setSensitivity " + str_sprintf("%.0f", id(number_mmwave_maintain_sensitivity).state) + " " + str_sprintf("%.0f", id(number_mmwave_trigger_sensitivity).state) + "\r\n";
+          return std::vector<uint8_t>(command.begin(), command.end());
+      - script.execute: script_mmwave_post_set
+      - script.wait: script_mmwave_post_set
+      - uart.write: "getSensitivity\r\n"
+
+  - id: script_mmwave_set_latencies
+    then:
+      - script.execute: script_mmwave_pre_set
+      - script.wait: script_mmwave_pre_set
+      - uart.write: !lambda |-
+          std::string command = "setLatency " + str_sprintf("%.1f", id(number_mmwave_enter_latency).state) + " " + str_sprintf("%.0f", id(number_mmwave_exit_latency).state) + "\r\n";
+          return std::vector<uint8_t>(command.begin(),command.end());
+      - script.execute: script_mmwave_post_set
+      - script.wait: script_mmwave_post_set
+      - uart.write: "getLatency\r\n"
+
+  - id: script_mmwave_set_inhibit_time
+    then:
+      - script.execute: script_mmwave_pre_set
+      - script.wait: script_mmwave_pre_set
+      - uart.write: !lambda |-
+          std::string command = "setInhibit " + str_sprintf("%.0f", id(number_mmwave_inhibit_time).state) + "\r\n";
+          return std::vector<uint8_t>(command.begin(), command.end());
+      - script.execute: script_mmwave_post_set
+      - script.wait: script_mmwave_post_set
+      - uart.write: "getInhibit\r\n"
+
+  - id: script_mmwave_restart
+    then:
+      - wait_until:
+          condition:
+            binary_sensor.is_off: binary_sensor_mmwave_processing_command
+      - script.execute: script_partial_mmwave_set_started_processing
+      - uart.write: "resetSystem\r\n"
+      - delay: 1s
+      - script.execute: script_partial_mmwave_set_done_processing
+
+switch:
+  - platform: template
+    name: "${device_type}/${path}/presence_light"
+    id: switch_mmwave_light
+    optimistic: true
+    restore_mode: restore_default_on
+    entity_category: config
+    on_turn_on:
+      script.execute: script_update_led
+    on_turn_off:
+      script.execute: script_update_led
+
+number:
+  - platform: template
+    name: "${device_type}/${path}/param/range_min"
+    id: number_mmwave_range_min
+    min_value: 0.3
+    max_value: 6
+    step: 0.1
+    initial_value: 1.8
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: m
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_ranges
+
+  - platform: template
+    name: "${device_type}/${path}/param/range_max"
+    id: number_mmwave_range_max
+    min_value: 1.5
+    max_value: 11
+    step: 0.1
+    initial_value: 6
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: m
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_ranges
+
+  - platform: template
+    name: "${device_type}/${path}/param/maintain_sensitivity"
+    id: number_mmwave_maintain_sensitivity
+    min_value: 0
+    max_value: 9
+    step: 1
+    initial_value: 7
+    optimistic: true
+    restore_value: true
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_sensitivities
+
+  - platform: template
+    name: "${device_type}/${path}/param/trigger_sensitivity"
+    id: number_mmwave_trigger_sensitivity
+    min_value: 0
+    max_value: 9
+    step: 1
+    initial_value: 5
+    optimistic: true
+    restore_value: true
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_sensitivities
+
+  - platform: template
+    name: "${device_type}/${path}/param/enter_latency"
+    id: number_mmwave_enter_latency
+    min_value: 0.1
+    max_value: 60
+    step: 0.1
+    initial_value: 0.1
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: seconds
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_latencies
+
+  - platform: template
+    name: "${device_type}/${path}/param/exit_latency"
+    id: number_mmwave_exit_latency
+    min_value: 1
+    max_value: 300
+    step: 1
+    initial_value: 15
+    optimistic: true    
+    restore_value: true
+    unit_of_measurement: seconds
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_latencies
+
+  - platform: template
+    name: "${device_type}/${path}/param/inhibit_time"
+    id: number_mmwave_inhibit_time
+    min_value: 1
+    max_value: 255
+    step: 1
+    initial_value: 1
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: seconds
+    mode: box
+    entity_category: config
+    set_action:
+      - script.execute: script_mmwave_set_inhibit_time
+
+button:
+  - platform: template
+    name: "${device_type}/${path}/tool/get_all_params"
+    id: button_mmwave_param_get_all
+    entity_category: config
+    on_press:
+      - script.execute: script_mmwave_get_all_params
+      - script.wait: script_mmwave_get_all_params
+
+  - platform: template
+    name: "${device_type}/${path}/tool/setup_output"
+    id: button_mmwave_param_setup_output
+    entity_category: config
+    on_press:
+      - script.execute: script_mmwave_setup_output
+      - script.wait: script_mmwave_setup_output
+
+  - platform: template
+    name: "${device_type}/${path}/tool/reset_all"
+    id: button_mmwave_param_reset_all
+    entity_category: config
+    on_press:
+      - script.execute: script_mmwave_reset_config
+      - script.wait: script_mmwave_reset_config
+
+  - platform: restart
+    id: button_restart_esp
+
+  - platform: template
+    name: "${device_type}/${path}/tool/restart"
+    id: button_mmwave_restart
+    entity_category: config
+    on_press:
+      - script.execute: script_mmwave_restart
+      - script.wait: script_mmwave_restart
+      - button.press: button_restart_esp

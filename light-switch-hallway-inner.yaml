@@ -4,7 +4,7 @@ substitutions:
   hostname: "light-switch-hallway-inner"
 
 packages:
-  hardware: !include _hardware.esp8266.yaml
+  hardware: !include _hardware.gosund_sw9.yaml
   device: !include 
     file: _device.gosund_sw9.yaml
     vars: 

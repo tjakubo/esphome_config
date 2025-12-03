@@ -6,9 +6,9 @@ substitutions:
   device_type: "light_switch"
   relay_type: "light_relay"
   button_type: "light_button"
-  long_click_hold_time: 1s
+  long_click_hold_time: 600ms
   toggle_lighting_required_hold_time: 2s
-  toggle_direct_relay_control_hold_time: 5s
+  toggle_direct_relay_control_hold_time: 4s
   green_led_brightness_nominal: 12%
   green_led_brightness_presence_disabled: 20%
   red_led_brightness_direct_relay_control: 30%
@@ -24,40 +24,13 @@ packages:
 api:
   reboot_timeout: 0s
   on_client_connected:
-    - switch.turn_off: switch_direct_relay_control
-    - script.execute: script_update_leds
+    switch.turn_off: switch_direct_relay_control
   on_client_disconnected:
     if:
       condition:
         not: api.connected
       then: 
         switch.turn_on: switch_direct_relay_control
-
-output:
-  - platform: gpio
-    id: output_relay_1
-    pin: GPIO14
-  - platform: gpio
-    id: output_relay_2
-    pin: GPIO12
-  - platform: esp8266_pwm
-    pin:
-      number: GPIO13
-      inverted: true
-    frequency: 1000 Hz
-    id: pwm_green_leds
-  - platform: esp8266_pwm
-    pin:
-      number: GPIO02
-      inverted: true
-    frequency: 1000 Hz
-    id: pwm_red_led_left
-  - platform: esp8266_pwm
-    pin:
-      number: GPIO04
-      inverted: true
-    frequency: 1000 Hz
-    id: pwm_red_led_right
 
 script:
   - id: script_set_leds_direct_relay_control
@@ -112,13 +85,13 @@ script:
         else:
           - if:
               condition:
-                binary_sensor.is_off: ha_sensor_presence_lighting
+                binary_sensor.is_off: binary_sensor_ha_presence_lighting
               then:
                 script.execute: script_set_leds_presence_disabled
               else:
                 if:
                   condition:
-                    binary_sensor.is_off: ha_sensor_lighting_required
+                    binary_sensor.is_off: binary_sensor_ha_lighting_required
                   then:
                     script.execute: script_set_leds_lighting_not_required
                   else:
@@ -149,7 +122,7 @@ script:
     then:
       - if:
           condition:
-            binary_sensor.is_off: ha_sensor_presence_lighting
+            binary_sensor.is_off: binary_sensor_ha_presence_lighting
           then:
             - homeassistant.action:
                 action: input_boolean.turn_on
@@ -173,7 +146,7 @@ script:
         else:
           if: 
             condition: 
-              binary_sensor.is_off: button_sensor_both
+              binary_sensor.is_off: binary_sensor_both_buttons
             then: 
               if:
                 condition:
@@ -193,7 +166,7 @@ script:
       if: 
         condition: 
           - switch.is_off: switch_direct_relay_control
-          - binary_sensor.is_off: button_sensor_both
+          - binary_sensor.is_off: binary_sensor_both_buttons
         then:
           script.execute: 
             id: script_action_ha_button_press
@@ -247,27 +220,21 @@ button:
 
 binary_sensor:
   - platform: homeassistant
-    id: ha_sensor_presence_lighting
+    id: binary_sensor_ha_presence_lighting
     entity_id: ${entity_id_ha_helper_mode_presence_lighting}
     publish_initial_state: true
     on_state:
       script.execute: script_update_leds
   - platform: homeassistant
-    id: ha_sensor_lighting_required
+    id: binary_sensor_ha_lighting_required
     entity_id: ${entity_id_ha_helper_mode_lighting_required}
     publish_initial_state: true
     on_state:
       script.execute: script_update_leds
 
-  - platform: gpio
-    id: button_sensor_left
-    pin:
-      number: GPIO0
-      mode: INPUT_PULLUP
-      inverted: true
-    filters:
-      - delayed_on: 10ms
-      - delayed_off: 10ms
+  - platform: copy
+    id: binary_sensor_abstract_left_button
+    source_id: binary_sensor_left_button
     on_multi_click:
       - timing:
         - ON for at most ${long_click_hold_time}
@@ -284,15 +251,9 @@ binary_sensor:
             id: script_on_long_button_click
             right: false
 
-  - platform: gpio
-    id: button_sensor_right
-    pin:
-      number: GPIO5
-      mode: INPUT_PULLUP
-      inverted: true
-    filters:
-      - delayed_on: 10ms
-      - delayed_off: 10ms
+  - platform: copy
+    id: binary_sensor_abstract_right_button
+    source_id: binary_sensor_right_button
     on_multi_click:
       - timing:
         - ON for at most ${long_click_hold_time}
@@ -310,8 +271,8 @@ binary_sensor:
             right: true
   
   - platform: template
-    id: button_sensor_both
-    lambda: "return id(button_sensor_left).state && id(button_sensor_right).state;"
+    id: binary_sensor_both_buttons
+    lambda: "return id(binary_sensor_left_button).state && id(binary_sensor_right_button).state;"
     filters:
       - delayed_off: 100ms
     on_multi_click:

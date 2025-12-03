@@ -1,0 +1,7 @@
+substitutions:
+  path: "kitchen/sink"
+  hostname: "athom-kitchen-sink"
+
+packages:
+  hardware: !include _hardware.athom_ps_8285.yaml
+  device: !include _device.athom_ps.yaml

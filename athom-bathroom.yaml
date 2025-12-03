@@ -1,6 +1,6 @@
 substitutions:
-  path: "office"
-  hostname: "athom-office"
+  path: "bathroom"
+  hostname: "athom-bathroom"
 
 packages:
   hardware: !include _hardware.athom_ps_c3.yaml
