@@ -2,23 +2,24 @@ esphome:
   name: ${hostname}
   name_add_mac_suffix: false
   platformio_options:
-    board_upload.flash_size: 2MB
-    board_upload.maximum_size: 2097152
-    board_build.ldscript: eagle.flash.2m.ld
+    board_build.flash_mode: dio
 
-esp8266:
-  board: esp8285
-  restore_from_flash: true
+esp32:
+  board: esp32-c3-devkitm-1
+  flash_size: 4MB
+  variant: ESP32C3
+  framework:
+    type: esp-idf
 
 light:
   - platform: status_led
     id: light_led
-    pin: GPIO16
+    pin: GPIO2
 
 binary_sensor:
   - platform: gpio
     pin: 
-      number: GPIO14
+      number: GPIO3
       mode:
         input: true
         pullup: true
@@ -28,7 +29,7 @@ binary_sensor:
       - delayed_off: 500ms
   - platform: gpio
     pin:
-      number: GPIO12
+      number: GPIO4
       mode:
         input: true
         pullup: true
@@ -36,17 +37,14 @@ binary_sensor:
     filters:
       - delayed_on: 50ms
 
-preferences:
-  flash_write_interval: 1min
-
 i2c:
-  sda: GPIO4
-  scl: GPIO5
+  sda: GPIO18
+  scl: GPIO19
   scan: true
 
 uart:
-  tx_pin: GPIO15
-  rx_pin: GPIO13
+  tx_pin: GPIO8
+  rx_pin: GPIO5
   baud_rate: 115200
 
 api:
@@ -63,6 +61,7 @@ wifi:
   ap:
     ssid: !secret fallback_wifi_ssid
     password: !secret fallback_wifi_password
+  min_auth_mode: WPA2
 
 network:
   enable_ipv6: false
@@ -71,7 +70,5 @@ web_server:
   port: 80
 
 logger:
+  hardware_uart: UART0
   baud_rate: 115200
-
-mdns:
-  disabled: false

@@ -1,0 +1,40 @@
+- !include 
+    file: weather_forecast.yaml
+    vars:
+      time_offset: 3h
+      forecast_format: ${forecast_format}
+- !include 
+    file: weather_forecast.yaml
+    vars:
+      time_offset: 6h
+      forecast_format: ${forecast_format}
+- !include 
+    file: weather_forecast.yaml
+    vars:
+      time_offset: 9h
+      forecast_format: ${forecast_format}
+- !include 
+    file: weather_forecast.yaml
+    vars:
+      time_offset: 12h
+      forecast_format: ${forecast_format}
+- !include 
+    file: weather_forecast.yaml
+    vars:
+      time_offset: 15h
+      forecast_format: ${forecast_format}
+- !include 
+    file: weather_forecast.yaml
+    vars:
+      time_offset: 18h
+      forecast_format: ${forecast_format}
+- !include 
+    file: weather_forecast.yaml
+    vars:
+      time_offset: 21h
+      forecast_format: ${forecast_format}
+- !include 
+    file: weather_forecast.yaml
+    vars:
+      time_offset: 24h
+      forecast_format: ${forecast_format}

@@ -34,6 +34,7 @@ wifi:
     ssid: !secret fallback_wifi_ssid
     password: !secret fallback_wifi_password
   power_save_mode: LIGHT
+  min_auth_mode: WPA2
 
 network:
   enable_ipv6: false

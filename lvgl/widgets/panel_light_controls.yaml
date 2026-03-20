@@ -1,0 +1,58 @@
+obj:
+  layout:
+    type: flex
+    flex_flow: column
+    flex_align_main: space_between
+  grid_cell_x_align: stretch
+  grid_cell_y_align: stretch
+  widgets:
+    - container:
+        height: size_content
+        layout:
+          type: flex
+          flex_flow: row
+          flex_align_main: space_between
+          flex_align_cross: center
+        widgets:
+          - label:
+              text: ${label}
+              text_font: montserrat_16
+          - switch:
+              id: widget_${name}_light_switch
+              on_change:
+                script.execute:
+                  id: script_action_ha_light_control
+                  entity_id: ${entity_id}
+                  brightness: !lambda 'return x ? 255 : 0;'
+    - container:
+        height: size_content
+        layout:
+          type: flex
+          flex_flow: row
+          flex_align_main: space_between
+          flex_align_cross: center
+        widgets:
+          - container:
+              width: 80%
+              height: size_content
+              pad_top: 10
+              pad_bottom: 8
+              pad_left: 10
+              pad_right: 10
+              widgets:
+                - slider:
+                    id: widget_${name}_light_brightness_slider
+                    max_value: 255
+                    width: 100%
+                    height: 7
+                    knob:
+                      pad_all: 3
+                    on_release:
+                      then:
+                        - script.execute:
+                            id: script_action_ha_light_control
+                            entity_id: ${entity_id}
+                            brightness: !lambda 'return std::max(static_cast<int>(x), 3);'
+          - label:
+              id: widget_${name}_light_brightness_label
+              text_font: montserrat_14

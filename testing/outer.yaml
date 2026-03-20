@@ -1,0 +1,8 @@
+substitutions:
+  foo: This is default value from top-level substitutions section
+
+packages:
+  base: !include
+    file: middle.yaml
+    vars:
+      foo: "Overriden!"

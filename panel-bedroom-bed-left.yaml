@@ -1,0 +1,21 @@
+substitutions:
+  path: "bedroom/bed/left"
+  hostname: "panel-bedroom-bed-left"
+
+packages:
+  hardware: !include 
+    file: hardware/guiton_4848s040c.yaml
+    vars:
+      rotation: 180 # 90
+  device: !include 
+    file: device/guiton_4848s040c.bed_panel.yaml
+    vars:
+        left_light_label: Side light
+        left_light_entity: light.group_light_bedroom_wardrobe
+        right_light_label: Main light
+        right_light_entity: light.group_light_bedroom_bed
+        sleeping_mode_entity: input_boolean.helper_mode_bedroom_sleeping
+        image_of_the_day_pattern: "http://hass.lan/local/md_%d.png"
+        image_of_the_day_count: 2
+        image_of_the_day_offset: 2
+  sensors_diagnostic: !include sensors/diagnostic.esp32.yaml

@@ -1,0 +1,19 @@
+script:
+  - id: script_action_ha_input_boolean_control
+    parameters:
+      state: bool
+      entity_id: string
+    then:
+      - if:
+          condition:
+            lambda: 'return state;'
+          then:
+            homeassistant.service:
+              service: input_boolean.turn_on
+              data:
+                 entity_id: !lambda 'return entity_id;'
+          else:
+            homeassistant.service:
+              service: input_boolean.turn_off
+              data:
+                entity_id: !lambda 'return entity_id;'

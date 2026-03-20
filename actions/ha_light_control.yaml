@@ -1,0 +1,22 @@
+script:
+  - id: script_action_ha_light_control
+    parameters:
+      brightness: int
+      entity_id: string
+    then:
+      - if:
+          condition:
+            lambda: 'return brightness > 0;'
+          then:
+            homeassistant.service:
+              service: light.turn_on
+              data:
+                 entity_id: !lambda 'return entity_id;'
+                 transition: '1'
+              data_template:
+                 brightness: !lambda 'return brightness;'
+          else:
+            homeassistant.service:
+              service: light.turn_off
+              data:
+                entity_id: !lambda 'return entity_id;'

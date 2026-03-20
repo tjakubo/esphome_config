@@ -21,18 +21,31 @@ packages:
   action_ha_button_press: !include _action.ha_button_press.yaml
   sensors_diagnostic_common: !include _sensors.diagnostic.common.yaml
 
+globals:
+  - id: global_watchdog_triggered
+    type: bool
+    initial_value: "true"
+
 api:
   reboot_timeout: 0s
-  on_client_connected:
-    switch.turn_off: switch_direct_relay_control
-  on_client_disconnected:
-    if:
-      condition:
-        not: api.connected
-      then: 
-        switch.turn_on: switch_direct_relay_control
+  actions:
+    - action: action_feed_watchdog
+      then:
+        - script.execute: script_ha_watchdog
+        - lambda: |-
+            if (id(global_watchdog_triggered)) {
+              id(switch_direct_relay_control).turn_off();
+              id(global_watchdog_triggered) = false;
+            }
 
 script:
+  - id: script_ha_watchdog
+    mode: restart
+    then:
+      - delay: 90s
+      - switch.turn_on: switch_direct_relay_control
+      - lambda: "id(global_watchdog_triggered) = true;"
+      
   - id: script_set_leds_direct_relay_control
     then:
       - light.turn_off: 
@@ -134,65 +147,55 @@ script:
           data:
             entity_id: ${entity_id_ha_helper_mode_lighting_required}
 
-  - id: script_on_short_button_click
+  - id: script_on_button_click
     parameters:
       right: bool
+      short_press: bool
     then:
-      if:
-        condition:
-          switch.is_on: switch_direct_relay_control
-        then:
-          lambda: "(right ? id(switch_relay_${right_button_relay}) : id(switch_relay_${left_button_relay}))->toggle();"
-        else:
-          if: 
-            condition: 
-              binary_sensor.is_off: binary_sensor_both_buttons
-            then: 
-              if:
-                condition:
-                  lambda: "return id(switch_direct_relay_control).restore_mode && !(right ? id(switch_relay_${right_button_relay}) : id(switch_relay_${left_button_relay}))->state;"
-                then:
-                  - lambda: "(right ? id(switch_relay_${right_button_relay}) : id(switch_relay_${left_button_relay}))->toggle();"
-                  - script.execute: script_update_leds
-                else:
-                  script.execute: 
-                    id: script_action_ha_button_press
-                    entity_id: !lambda "return (right ? id(button_right_short) : id(button_left_short))->get_object_id();"
-        
-  - id: script_on_long_button_click
-    parameters:
-      right: bool
-    then:
-      if: 
-        condition: 
-          - switch.is_off: switch_direct_relay_control
-          - binary_sensor.is_off: binary_sensor_both_buttons
-        then:
-          script.execute: 
-            id: script_action_ha_button_press
-            entity_id: !lambda "return (right ? id(button_right_long) : id(button_left_long))->get_object_id();"
-
+      lambda: |-
+        if (id(binary_sensor_both_buttons)->state) {
+          return;
+        }
+        auto* direct_relay_control{ id(switch_direct_relay_control) };
+        auto* relay{ (right ? id(switch_relay_${right_button_relay}) : id(switch_relay_${left_button_relay})) };
+        if (direct_relay_control->state || (direct_relay_control->restore_mode && !relay->state)) { 
+          if (short_press) {
+            relay->toggle(); 
+            id(script_update_leds)->execute();
+          }
+          return; 
+        }
+        const auto entity_id{ [&]{
+          if (short_press)
+            return (right ? id(button_right_short) : id(button_left_short))->get_object_id();
+          else 
+            return (right ? id(button_right_long) : id(button_left_long))->get_object_id();
+        }() };
+        id(script_action_ha_button_press)->execute(entity_id);
+            
 switch:
   - platform: template
     optimistic: true
     name: "${device_type}/${path}/direct_relay_control"
     id: switch_direct_relay_control
     restore_mode: always_on
-    on_turn_on: 
-      script.execute: script_update_leds
-    on_turn_off: 
+    on_state: 
       script.execute: script_update_leds
   - platform: output
     name: "${relay_type}/${path}/${relay_1_suffix}"
     id: switch_relay_1
     output: output_relay_1
     restore_mode: always_off
+    on_state: 
+      script.execute: script_update_leds
   - platform: output
     name: "${relay_type}/${path}/${relay_2_suffix}"
     id: switch_relay_2
     output: output_relay_2
     restore_mode: always_off
-
+    on_state: 
+      script.execute: script_update_leds
+  
 light:
   - platform: monochromatic
     id: light_green_leds
@@ -222,53 +225,59 @@ binary_sensor:
   - platform: homeassistant
     id: binary_sensor_ha_presence_lighting
     entity_id: ${entity_id_ha_helper_mode_presence_lighting}
-    publish_initial_state: true
+    trigger_on_initial_state: true
     on_state:
       script.execute: script_update_leds
   - platform: homeassistant
     id: binary_sensor_ha_lighting_required
     entity_id: ${entity_id_ha_helper_mode_lighting_required}
-    publish_initial_state: true
+    trigger_on_initial_state: true
     on_state:
       script.execute: script_update_leds
 
   - platform: copy
     id: binary_sensor_abstract_left_button
     source_id: binary_sensor_left_button
+    trigger_on_initial_state: true
     on_multi_click:
       - timing:
         - ON for at most ${long_click_hold_time}
         invalid_cooldown: 100ms
         then:
           script.execute: 
-            id: script_on_short_button_click
+            id: script_on_button_click
             right: false
+            short_press: true
       - timing: 
         - ON for at least ${long_click_hold_time}
         invalid_cooldown: 100ms
         then:
           script.execute: 
-            id: script_on_long_button_click
+            id: script_on_button_click
             right: false
+            short_press: false
 
   - platform: copy
     id: binary_sensor_abstract_right_button
     source_id: binary_sensor_right_button
+    trigger_on_initial_state: true
     on_multi_click:
       - timing:
         - ON for at most ${long_click_hold_time}
         invalid_cooldown: 100ms
         then:
           script.execute: 
-            id: script_on_short_button_click
+            id: script_on_button_click
             right: true
+            short_press: true
       - timing: 
         - ON for at least ${long_click_hold_time}
         invalid_cooldown: 100ms
         then:
           script.execute: 
-            id: script_on_long_button_click
+            id: script_on_button_click
             right: true
+            short_press: false
   
   - platform: template
     id: binary_sensor_both_buttons

@@ -3,11 +3,12 @@ substitutions:
   hostname: "light-hallway-strip"
 
 packages:
-  hardware: !include _hardware.esp8266.yaml
+  hardware: !include hardware/shelly_rgbw2.yaml
   device: !include 
-    file: _device.shelly_rgbw2.yaml
+    file: device/shelly_rgbw2.yaml
     vars: 
       channel_2_light_name: "inner"
       channel_2_internal: "false"
       channel_4_light_name: "entrance"
       channel_4_internal: "false"
+  diagnostic: !include sensors/diagnostic.yaml

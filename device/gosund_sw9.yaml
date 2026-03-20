@@ -1,0 +1,307 @@
+substitutions:
+  device_type: "light_switch"
+  relay_type: "light_relay"
+  button_type: "light_button"
+  left_button_relay: "1"
+  right_button_relay: "2"
+  long_click_hold_time: 600ms
+  toggle_lighting_required_hold_time: 2s
+  toggle_direct_relay_control_hold_time: 4s
+  green_led_brightness_nominal: 12%
+  green_led_brightness_presence_disabled: 20%
+  red_led_brightness_direct_relay_control: 30%
+  red_led_brightness_presence_disabled: 40%
+  red_led_brightness_relay_disabled_no_direct_relay_control: 100%
+  entity_id_ha_helper_mode_presence_lighting: "input_boolean.helper_mode_${mode_id_path}_presence_lighting"
+  entity_id_ha_helper_mode_lighting_required: "input_boolean.helper_mode_${mode_id_path}_lighting_required"
+
+packages:
+  action_ha_button_press: !include ../actions/ha_button_press.yaml
+  sensors_common: !include ../sensors/common.yaml
+
+globals:
+  - id: global_watchdog_triggered
+    type: bool
+    initial_value: "true"
+
+api:
+  reboot_timeout: 0s
+  actions:
+    - action: action_feed_watchdog
+      then:
+        - script.execute: script_ha_watchdog
+        - lambda: |-
+            if (id(global_watchdog_triggered)) {
+              id(switch_direct_relay_control).turn_off();
+              id(global_watchdog_triggered) = false;
+            }
+
+script:
+  - id: script_ha_watchdog
+    mode: restart
+    then:
+      - delay: 90s
+      - switch.turn_on: switch_direct_relay_control
+      - lambda: "id(global_watchdog_triggered) = true;"
+      
+  - id: script_set_leds_direct_relay_control
+    then:
+      - light.turn_off: 
+          id: light_green_leds
+      - light.turn_on: 
+          id: light_red_led_left
+          brightness: ${red_led_brightness_direct_relay_control}
+      - light.turn_on: 
+          id: light_red_led_right
+          brightness: ${red_led_brightness_direct_relay_control}
+
+  - id: script_set_leds_presence_disabled
+    then:
+      - light.turn_on: 
+          id: light_green_leds
+          brightness: ${green_led_brightness_presence_disabled}
+      - light.turn_on: 
+          id: light_red_led_left
+          brightness: ${red_led_brightness_presence_disabled}
+      - light.turn_on: 
+          id: light_red_led_right
+          brightness: ${red_led_brightness_presence_disabled}
+
+  - id: script_set_leds_lighting_not_required
+    then:
+      - light.turn_off: 
+          id: light_green_leds
+      - light.turn_off: 
+          id: light_red_led_left
+      - light.turn_off: 
+          id: light_red_led_right
+
+  - id: script_set_leds_nominal
+    then:
+      - light.turn_on: 
+          id: light_green_leds
+          brightness: ${green_led_brightness_nominal}
+      - light.turn_off: 
+          id: light_red_led_left
+      - light.turn_off: 
+          id: light_red_led_right
+
+  - id: script_update_leds
+    then:
+      if:
+        condition: 
+          switch.is_on: switch_direct_relay_control
+        then:
+          - script.execute: script_set_leds_direct_relay_control
+        else:
+          - if:
+              condition:
+                binary_sensor.is_off: binary_sensor_ha_presence_lighting
+              then:
+                script.execute: script_set_leds_presence_disabled
+              else:
+                if:
+                  condition:
+                    binary_sensor.is_off: binary_sensor_ha_lighting_required
+                  then:
+                    script.execute: script_set_leds_lighting_not_required
+                  else:
+                    script.execute: script_set_leds_nominal
+          - if:
+              condition:
+                lambda: "return id(switch_direct_relay_control).restore_mode && !id(switch_relay_${left_button_relay}).state;"
+              then:
+                light.turn_on: 
+                  id: light_red_led_left
+                  brightness: ${red_led_brightness_relay_disabled_no_direct_relay_control}
+          - if:
+              condition:
+                lambda: "return id(switch_direct_relay_control).restore_mode && !id(switch_relay_${right_button_relay}).state;"
+              then:
+                light.turn_on: 
+                  id: light_red_led_right
+                  brightness: ${red_led_brightness_relay_disabled_no_direct_relay_control}
+
+  - id: script_toggle_presence_lighting
+    then:
+      - homeassistant.action:
+          action: input_boolean.toggle
+          data:
+            entity_id: ${entity_id_ha_helper_mode_presence_lighting}
+
+  - id: script_toggle_lighting_required
+    then:
+      - if:
+          condition:
+            binary_sensor.is_off: binary_sensor_ha_presence_lighting
+          then:
+            - homeassistant.action:
+                action: input_boolean.turn_on
+                data:
+                  entity_id: ${entity_id_ha_helper_mode_presence_lighting}
+      - delay: 200ms
+      - homeassistant.action:
+          action: input_boolean.toggle
+          data:
+            entity_id: ${entity_id_ha_helper_mode_lighting_required}
+
+  - id: script_on_button_click
+    parameters:
+      right: bool
+      short_press: bool
+    then:
+      lambda: |-
+        if (id(binary_sensor_both_buttons)->state) {
+          return;
+        }
+        auto* direct_relay_control{ id(switch_direct_relay_control) };
+        auto* relay{ (right ? id(switch_relay_${right_button_relay}) : id(switch_relay_${left_button_relay})) };
+        if (direct_relay_control->state || (direct_relay_control->restore_mode && !relay->state)) { 
+          if (short_press) {
+            relay->toggle(); 
+            id(script_update_leds)->execute();
+          }
+          return; 
+        }
+        const auto entity_id{ [&]{
+          if (short_press)
+            return (right ? id(button_right_short) : id(button_left_short))->get_object_id();
+          else 
+            return (right ? id(button_right_long) : id(button_left_long))->get_object_id();
+        }() };
+        id(script_action_ha_button_press)->execute(entity_id);
+            
+switch:
+  - platform: template
+    optimistic: true
+    name: "${device_type}/${path}/direct_relay_control"
+    id: switch_direct_relay_control
+    restore_mode: always_on
+    on_state: 
+      script.execute: script_update_leds
+  - platform: output
+    name: "${relay_type}/${path}/${relay_1_suffix}"
+    id: switch_relay_1
+    output: output_relay_1
+    restore_mode: always_off
+    on_state: 
+      script.execute: script_update_leds
+  - platform: output
+    name: "${relay_type}/${path}/${relay_2_suffix}"
+    id: switch_relay_2
+    output: output_relay_2
+    restore_mode: always_off
+    on_state: 
+      script.execute: script_update_leds
+  
+light:
+  - platform: monochromatic
+    id: light_green_leds
+    output: pwm_green_leds
+  - platform: monochromatic
+    id: light_red_led_left
+    output: pwm_red_led_left
+  - platform: monochromatic
+    id: light_red_led_right
+    output: pwm_red_led_right
+
+button:
+  - platform: template
+    name: "${button_type}/${path}/left/short"
+    id: button_left_short
+  - platform: template
+    name: "${button_type}/${path}/left/long"
+    id: button_left_long
+  - platform: template
+    name: "${button_type}/${path}/right/short"
+    id: button_right_short
+  - platform: template
+    name: "${button_type}/${path}/right/long"
+    id: button_right_long
+
+binary_sensor:
+  - platform: homeassistant
+    id: binary_sensor_ha_presence_lighting
+    entity_id: ${entity_id_ha_helper_mode_presence_lighting}
+    trigger_on_initial_state: true
+    on_state:
+      script.execute: script_update_leds
+  - platform: homeassistant
+    id: binary_sensor_ha_lighting_required
+    entity_id: ${entity_id_ha_helper_mode_lighting_required}
+    trigger_on_initial_state: true
+    on_state:
+      script.execute: script_update_leds
+
+  - platform: copy
+    id: binary_sensor_abstract_left_button
+    source_id: binary_sensor_left_button
+    trigger_on_initial_state: true
+    on_multi_click:
+      - timing:
+        - ON for at most ${long_click_hold_time}
+        invalid_cooldown: 100ms
+        then:
+          script.execute: 
+            id: script_on_button_click
+            right: false
+            short_press: true
+      - timing: 
+        - ON for at least ${long_click_hold_time}
+        invalid_cooldown: 100ms
+        then:
+          script.execute: 
+            id: script_on_button_click
+            right: false
+            short_press: false
+
+  - platform: copy
+    id: binary_sensor_abstract_right_button
+    source_id: binary_sensor_right_button
+    trigger_on_initial_state: true
+    on_multi_click:
+      - timing:
+        - ON for at most ${long_click_hold_time}
+        invalid_cooldown: 100ms
+        then:
+          script.execute: 
+            id: script_on_button_click
+            right: true
+            short_press: true
+      - timing: 
+        - ON for at least ${long_click_hold_time}
+        invalid_cooldown: 100ms
+        then:
+          script.execute: 
+            id: script_on_button_click
+            right: true
+            short_press: false
+  
+  - platform: template
+    id: binary_sensor_both_buttons
+    lambda: "return id(binary_sensor_left_button).state && id(binary_sensor_right_button).state;"
+    filters:
+      - delayed_off: 100ms
+    on_multi_click:
+      - timing: 
+        - ON for at least ${long_click_hold_time}
+        invalid_cooldown: 100ms
+        then:
+          if:
+            condition:
+              switch.is_off: switch_direct_relay_control
+            then:
+              script.execute: script_toggle_presence_lighting
+            else:
+              switch.toggle: switch_direct_relay_control
+      - timing: 
+        - ON for at least ${toggle_lighting_required_hold_time}
+        invalid_cooldown: 100ms
+        then:
+          script.execute: script_toggle_lighting_required
+      - timing:
+        - ON for at least ${toggle_direct_relay_control_hold_time}
+        invalid_cooldown: 100ms
+        then:
+          - switch.toggle: switch_direct_relay_control
+          - script.execute: script_toggle_lighting_required

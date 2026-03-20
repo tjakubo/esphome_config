@@ -1,0 +1,348 @@
+substitutions:
+  device_type: panel
+  debug_layout: false
+
+packages:
+  forecast: !include ../sensors/weather/24h_forecast.yaml
+  common_sensors: !include ../sensors/common.yaml
+  light_control: !include ../actions/ha_light_control.yaml
+  input_boolean_control: !include ../actions/ha_input_boolean_control.yaml
+  left_light_update: !include
+    file: ../lvgl/updates/panel_light_controls.yaml
+    vars:
+      name: left
+      entity_id: ${left_light_entity}
+  right_light_update: !include
+    file: ../lvgl/updates/panel_light_controls.yaml
+    vars:
+      name: right   
+      entity_id: ${right_light_entity}
+      
+binary_sensor:
+  - platform: homeassistant
+    id: binary_sensor_ha_sleeping_mode
+    entity_id: ${sleeping_mode_entity}
+    trigger_on_initial_state: true
+    on_state:
+      script.execute: 
+        id: script_update_sleeping_mode_widgets
+        enabled: !lambda return x;
+        
+sensor:
+  - platform: homeassistant
+    id: sensor_ha_outside_temperature
+    entity_id: weather.forecast_home
+    attribute: temperature
+    on_value:
+      then:
+        script.execute: script_update_outside_climate
+
+text_sensor:
+  - platform: homeassistant
+    id: text_sensor_ha_outside_weather
+    entity_id: weather.forecast_home
+    on_value:
+      then:
+        - script.execute: script_update_outside_climate
+        - script.execute: script_update_forecast
+
+.lvgl_common:
+  - &mixin_grid_cells_align_stretch
+    grid_cell_x_align: stretch
+    grid_cell_y_align: stretch
+  - &mixin_forecast_cell
+    recolor: true
+    text_font: montserrat_16
+    
+mapping:
+  - id: mapping_ha_weather_to_display
+    from: string
+    to: string
+    entries:
+      clear-night: Clear
+      cloudy: Cloudy
+      fog: Foggy
+      hail: Hailing
+      lightning: Stormy
+      lightning-rainy: Stormy & rainy
+      partlycloudy: Partly cloudy
+      pouring: Very rainy
+      rainy: Rainy
+      snowy: Snowy
+      snowy-rainy: Snowy & rainy
+      sunny: Sunny
+      windy: Windy
+      windy-variant: Cloudy & windy
+      exceptional: Unusual
+      
+script:
+  - id: script_update_time
+    then:
+      - lvgl.label.update:
+          id: widget_clock
+          text: !lambda 'return id(ha_time).now().strftime("%H:%M");'
+  - id: script_update_date
+    then:
+      - lvgl.label.update:
+          id: widget_today_date
+          text: !lambda |-
+            auto now{ id(ha_time).now() };
+            const std::string weekDayAndMonth{ now.strftime("%A, %B") };
+            const auto monthDay{ esphome::parse_number<int>(now.strftime("%d")).value() };
+            return esphome::str_sprintf("%s %d", weekDayAndMonth.c_str(), monthDay);
+  - id: script_update_outside_climate
+    then:
+      - lvgl.label.update:
+          id: widget_current_outside_temperature
+          text: !lambda 'return esphome::str_sprintf("%.1f°", id(sensor_ha_outside_temperature).state);'
+      - lvgl.label.update:
+          id: widget_current_outside_conditions
+          text: !lambda 'return id(mapping_ha_weather_to_display).get(id(text_sensor_ha_outside_weather).state.c_str());'
+  - id: script_update_forecast
+    then: !include 
+      file: ../lvgl/updates/24h_weather_forecasts.yaml
+      vars:
+        forecast_format: '#808080 %d:00#\n%.1f°\n#8888ff %d%%#'
+  - id: script_update_image_of_the_day
+    then:
+      - online_image.release: online_image_of_the_day
+      - online_image.set_url:
+          id: online_image_of_the_day
+          url: !lambda |-
+            const auto day{ id(ha_time).now().day_of_year + ${image_of_the_day_offset} };
+            const auto image_number{ (day % ${image_of_the_day_count}) + 1 };
+            return esphome::str_sprintf("${image_of_the_day_pattern}", image_number);
+  - id: script_update_sleeping_mode_widgets
+    parameters:
+      enabled: bool
+    then:
+      - lvgl.widget.update:
+          id: widget_sleeping_mode_switch
+          state:
+            checked: !lambda return enabled;
+      - number.set:
+          id: number_backlight_brightness
+          value: !lambda 'return enabled ? 0.3f : 1.0f;'
+  - id: !extend script_on_display_sleep
+    then:
+      - lvgl.page.show: page_main
+            
+wifi:
+  on_connect:
+    - delay: 1s
+    - script.execute: script_update_image_of_the_day
+
+http_request:
+            
+online_image:
+  - id: online_image_of_the_day
+    url: "http://nonexistent"
+    format: png
+    type: rgb565
+    on_download_finished:
+      then:
+        - lvgl.image.update:
+            id: widget_image_of_the_day
+            src: online_image_of_the_day
+
+time:
+  - id: !extend ha_time
+    on_time_sync:
+      - script.execute: script_update_time
+      - script.execute: script_update_date
+    on_time:
+      - minutes: '*'
+        seconds: 0
+        then:
+          script.execute: script_update_time
+      - hours: 0
+        then:
+          script.execute: script_update_date
+      - hours: 5
+        then:
+          script.execute: script_update_image_of_the_day
+  
+font:
+  - file: "fonts/Montserrat-Regular.ttf"
+    id: montserrat_65
+    size: 65
+    glyphs: "0123456789:.°"
+    bpp: 4
+  
+lvgl:    
+  theme:    
+    container:
+      bg_color: 0x1d1d1d
+      text_color: 0xe0e0e0
+      border_width: ${ 1 if debug_layout else 0 }
+      
+    obj:
+      bg_color: 0x1d1d1d
+      text_color: 0xe0e0e0
+      border_color: 0x2d2d2d
+      border_width: 2
+      
+    label:
+      text_color: 0xe0e0e0
+      border_width: ${ 1 if debug_layout else 0 }  
+
+    switch:
+      border_width: ${ 1 if debug_layout else 0 }  
+      
+    slider:
+      border_width: ${ 1 if debug_layout else 0 }  
+    
+  pages:
+    - id: page_main
+      bg_color: 0x0d0d0d
+      layout:
+        type: grid
+        grid_rows: [fr(2), fr(1), fr(1)]
+        grid_columns: [fr(1)]
+        pad_row: 10
+        pad_column: 10
+      pad_all: 10
+      widgets:
+        - obj:
+            <<: *mixin_grid_cells_align_stretch
+            layout:
+              type: flex
+              flex_flow: column
+              flex_align_main: space_between
+              flex_align_cross: stretch
+            pad_top: 0
+            widgets:
+              - container:
+                  height: size_content
+                  layout:
+                    type: flex
+                    flex_flow: row
+                    flex_align_main: space_between
+                  widgets:
+                    - label:
+                        id: widget_clock
+                        text_font: montserrat_65
+                    - label:
+                        id: widget_current_outside_temperature
+                        text_font: montserrat_65
+              - container:
+                  height: size_content
+                  layout:
+                    type: flex
+                    flex_flow: row
+                    flex_align_main: space_between
+                  widgets:
+                    - label:
+                        id: widget_today_date
+                        text_font: montserrat_20
+                    - label:
+                        id: widget_current_outside_conditions
+                        text_font: montserrat_20
+              - container:
+                  height: size_content
+                  layout:
+                    type: flex
+                    flex_flow: row
+                    flex_align_main: space_between
+                  widgets:
+                    - label: 
+                        id: widget_forecast_3h
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_6h
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_9h
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_12h
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_15h
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_18h
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_21h
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_24h
+                        <<: *mixin_forecast_cell
+                        
+        - container:
+            <<: *mixin_grid_cells_align_stretch
+            layout:
+              type: grid
+              grid_rows: [fr(1)]
+              grid_columns: [fr(1), fr(1)]
+              pad_row: 10
+              pad_column: 10
+            widgets:
+              - !include 
+                  file: ../lvgl/widgets/panel_light_controls.yaml
+                  vars:
+                    name: left
+                    label: ${left_light_label}
+                    entity_id: ${left_light_entity}
+              - !include 
+                  file: ../lvgl/widgets/panel_light_controls.yaml
+                  vars:
+                    name: right
+                    label: ${right_light_label}
+                    entity_id: ${right_light_entity}
+        - container:
+            <<: *mixin_grid_cells_align_stretch
+            layout:
+              type: grid
+              grid_rows: [fr(1)]
+              grid_columns: [fr(1), fr(1)]
+              pad_row: 10
+              pad_column: 10
+            widgets:
+              - obj:
+                  pad_all: 15
+                  <<: *mixin_grid_cells_align_stretch
+                  widgets:
+                    - button:
+                        width: 100%
+                        height: 100%
+                        align: center
+                        widgets:
+                          - label:
+                              align: center
+                              text: Pyszcz of the day
+                        on_click:
+                          then:
+                            - lvgl.page.show: 
+                                id: page_image_of_the_day
+              - obj:
+                  layout:
+                    type: flex
+                    flex_flow: column
+                    flex_align_main: space_around
+                    flex_align_cross: center
+                    flex_align_track: center
+                  <<: *mixin_grid_cells_align_stretch
+                  widgets:
+                  - label:
+                      text: Sleeping mode
+                      text_font: montserrat_16
+                  - switch:
+                      id: widget_sleeping_mode_switch
+                      on_change:
+                        script.execute:
+                          id: script_action_ha_input_boolean_control
+                          entity_id: ${sleeping_mode_entity}
+                          state: !lambda 'return x;'
+      
+    - id: page_image_of_the_day
+      widgets:
+        - image:
+            id: widget_image_of_the_day
+            src: online_image_of_the_day
+            width: 100%
+            height: 100%
+            on_click:
+              - lvgl.page.show: 
+                  id: page_main

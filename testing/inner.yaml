@@ -1,0 +1,9 @@
+substitutions:
+  foo: This is default value from inner substitutions section
+
+esphome:
+  name: substest
+  friendly_name: ${foo}
+
+esp32:
+  board: lolin_s2_mini

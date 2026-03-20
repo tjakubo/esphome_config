@@ -67,7 +67,7 @@ binary_sensor:
   - platform: homeassistant
     id: ha_sensor_mode_sleeping
     entity_id: ${entity_id_ha_helper_mode_sleeping}
-    publish_initial_state: true
+    trigger_on_initial_state: true
 
 sensor:
   - platform: scd4x

@@ -3,13 +3,11 @@ substitutions:
   hostname: "apollo-bedroom"
 
 packages:
-  hardware: !include _hardware.apollo_msr2.yaml
+  hardware: !include hardware/apollo_msr2.yaml
   device: !include 
-    file: _device.apollo_msr2.core_slim.yaml
+    file: device/apollo_msr2.yaml
     vars:
       entity_id_ha_helper_mode_sleeping: "input_boolean.helper_mode_bedroom_sleeping"
-  beacon: !include _device.apollo_msr2.beacon.yaml
-  tracking: !include _ibeacon.tracking.all.yaml
-
-debug:
-  update_interval: 30s
+  beacon: !include device/apollo_msr2.beacon.yaml
+  tracking: !include sensors/ibeacon/tracking.all.yaml
+  diagnostic: !include sensors/diagnostic.esp32.yaml

@@ -3,7 +3,8 @@ substitutions:
   hostname: "apollo-kitchen"
 
 packages:
-  hardware: !include _hardware.apollo_msr2.yaml
-  device: !include _device.apollo_msr2.core_slim.yaml
-  beacon: !include _device.apollo_msr2.beacon.yaml
-  tracking: !include _ibeacon.tracking.all.yaml
+  hardware: !include hardware/apollo_msr2.yaml
+  device: !include device/apollo_msr2.yaml
+  beacon: !include device/apollo_msr2.beacon.yaml
+  tracking: !include sensors/ibeacon/tracking.all.yaml
+  diagnostic: !include sensors/diagnostic.esp32.yaml

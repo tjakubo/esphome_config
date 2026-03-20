@@ -3,5 +3,6 @@ substitutions:
   hostname: "athom-office-desk"
 
 packages:
-  hardware: !include _hardware.athom_ps_8285.yaml
-  device: !include _device.athom_ps.yaml
+  hardware: !include hardware/athom_ps_c3.yaml
+  device: !include device/athom_ps.yaml
+  diagnostic: !include sensors/diagnostic.esp32.yaml

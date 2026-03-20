@@ -1,0 +1,8 @@
+substitutions:
+  foo: This is default value from middle substitutions section
+
+packages:
+  base: !include
+    file: inner.yaml
+    vars: 
+      foo: ${foo}

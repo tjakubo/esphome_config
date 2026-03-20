@@ -1,0 +1,9 @@
+substitutions:
+  path: "bathroom"
+  hostname: "apollo-bathroom"
+
+packages:
+  hardware: !include _hardware.apollo_msr2.yaml
+  device: !include _device.apollo_msr2.yaml
+  beacon: !include _device.apollo_msr2.beacon.yaml
+  tracking: !include _ibeacon.tracking.all.yaml

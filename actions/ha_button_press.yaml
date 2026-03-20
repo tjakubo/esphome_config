@@ -1,0 +1,9 @@
+script:
+  - id: script_action_ha_button_press
+    parameters:
+      entity_id: string
+    then:
+      - homeassistant.action:
+          action: button.press
+          data:
+            entity_id: !lambda return std::string{ "button." } + entity_id;

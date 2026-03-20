@@ -1,0 +1,26 @@
+script:
+  - id: script_update_${name}_light_widgets
+    parameters:
+      brightness: int
+    then:
+      - lvgl.widget.update:
+          id: widget_${name}_light_switch
+          state:
+            checked: !lambda 'return brightness > 0;'
+      - lvgl.slider.update:
+          id: widget_${name}_light_brightness_slider
+          value: !lambda 'return brightness;'
+      - lvgl.label.update:
+          id: widget_${name}_light_brightness_label
+          text: !lambda 'return brightness > 0 ? esphome::str_sprintf("%.0f%%", 100.0*brightness/255.0) : "OFF";'
+          
+text_sensor:
+  - platform: homeassistant
+    id: text_sensor_ha_${name}_light_brightness
+    entity_id: ${entity_id}
+    on_value:
+       - script.execute:
+           id: script_update_${name}_light_widgets
+           brightness: !lambda |-
+             return esphome::parse_number<float>(x.c_str()).value_or(0);
+    attribute: brightness

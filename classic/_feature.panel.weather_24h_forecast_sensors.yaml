@@ -1,0 +1,33 @@
+packages:
+  forecast_3h: !include 
+    file: _feature.panel.weather_forecast_sensor.yaml
+    vars:
+      time_offset: 3h
+  forecast_6h: !include 
+    file: _feature.panel.weather_forecast_sensor.yaml
+    vars:
+      time_offset: 6h
+  forecast_9h: !include 
+    file: _feature.panel.weather_forecast_sensor.yaml
+    vars:
+      time_offset: 9h
+  forecast_12h: !include 
+    file: _feature.panel.weather_forecast_sensor.yaml
+    vars:
+      time_offset: 12h
+  forecast_15h: !include 
+    file: _feature.panel.weather_forecast_sensor.yaml
+    vars:
+      time_offset: 15h
+  forecast_18h: !include 
+    file: _feature.panel.weather_forecast_sensor.yaml
+    vars:
+      time_offset: 18h
+  forecast_21h: !include 
+    file: _feature.panel.weather_forecast_sensor.yaml
+    vars:
+      time_offset: 21h
+  forecast_24h: !include 
+    file: _feature.panel.weather_forecast_sensor.yaml
+    vars:
+      time_offset: 24h

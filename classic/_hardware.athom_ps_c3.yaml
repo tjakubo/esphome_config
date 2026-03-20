@@ -61,6 +61,7 @@ wifi:
   ap:
     ssid: !secret fallback_wifi_ssid
     password: !secret fallback_wifi_password
+  min_auth_mode: WPA2
 
 network:
   enable_ipv6: false

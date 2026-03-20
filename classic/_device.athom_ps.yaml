@@ -23,7 +23,7 @@ binary_sensor:
   - platform: template
     name: "${device_type}/${path}/processing_command"
     id: binary_sensor_mmwave_processing_command
-    entity_category: config
+    entity_category: diagnostic
 
 sensor:
   - platform: bh1750

@@ -1,0 +1,273 @@
+substitutions:
+  path: "bedroom/bed/left"
+  hostname: "panel-bedroom-bed-left"
+
+packages:
+  hardware: !include _hardware.guiton_4848s040c.yaml
+  sensors_diagnostic_common: !include _sensors.diagnostic.common.yaml
+  forecast: !include _feature.panel.weather_24h_forecast_sensors.yaml
+
+sensor:
+  - platform: homeassistant
+    id: sensor_ha_outside_temperature
+    entity_id: weather.forecast_home
+    attribute: temperature
+    on_value:
+      then:
+        script.execute: script_update_outside_climate
+  
+text_sensor:
+  - platform: homeassistant
+    id: text_sensor_ha_outside_weather
+    entity_id: weather.forecast_home
+    on_value:
+      then:
+        - script.execute: script_update_outside_climate
+        - script.execute: script_update_forecast
+        
+.lvgl_common:
+  - &mixin_grid_cells_align_stretch
+    grid_cell_x_align: stretch
+    grid_cell_y_align: stretch
+  - &mixin_forecast_cell
+    grid_cell_x_align: center
+    recolor: true
+    text_font: montserrat_14
+    
+mapping:
+  - id: mapping_ha_weather_to_display
+    from: string
+    to: string
+    entries:
+      clear-night: clear
+      cloudy: cloudy
+      fog: foggy
+      hail: hail
+      lightning: stormy
+      lightning-rainy: stormy, rainy
+      partlycloudy: partly cloudy
+      pouring: very rainy
+      rainy: rainy
+      snowy: snow
+      snowy-rainy: snowy, rainy
+      sunny: sunny
+      windy: windy
+      windy-variant: cloudy, windy
+      exceptional: unusual
+      
+globals:
+  - id: global_current_climate_format
+    type: std::string
+    initial_value: ''
+      
+script:
+  - id: script_update_time
+    then:
+      - lvgl.label.update:
+          id: widget_clock
+          text: !lambda 'return id(ha_time).now().strftime("%H:%M");'
+  - id: script_update_outside_climate
+    then:
+      - lvgl.label.update:
+          id: widget_current_outside_climate
+          text: !lambda |- 
+            const auto weatherKey{ id(text_sensor_ha_outside_weather).state.c_str() };
+            return esphome::str_sprintf("%.1f°, %s", id(sensor_ha_outside_temperature).state, id(mapping_ha_weather_to_display).get(weatherKey).c_str());
+  - id: script_update_forecast
+    then: !include 
+      file: _lvgl.panel.update_24h_weather_forecasts.yaml
+      vars:
+        forecast_format: '#808080 %s:00#\n%s°'
+      
+time:
+  - id: !extend ha_time
+    on_time_sync:
+      script.execute: script_update_time
+    on_time:
+      - minutes: '*'
+        seconds: 0
+        then:
+          script.execute: script_update_time
+  
+font:
+  - file: "fonts/Montserrat-Regular.ttf"  # Use your font file path
+    id: montserrat_65
+    size: 65
+    glyphs: "0123456789:."
+    bpp: 4
+  
+lvgl:
+  #style_definitions:
+    #- id: card_style
+    #  border_width: 2
+    #  border_color: 0x808080
+    #  border_opa: COVER
+    #  bg_color: 0x1a1a1a
+    #  bg_opa: COVER
+    #  #pad_all: 8
+    #  radius: 8
+   # 
+    #- id: text_style
+    #  text_color: 0xFFFFFF
+    #  text_font: montserrat_20
+    
+    #- id: grid_item_style
+    #  pad_all: 5
+    
+  theme:    
+    container:
+      bg_color: 0x1d1d1d
+      bg_opa: COVER
+      text_color: 0xe0e0e0
+      border_color: 0x2d2d2d
+      
+    obj:
+      bg_color: 0x1d1d1d
+      bg_opa: COVER
+      text_color: 0xe0e0e0
+      border_color: 0x2d2d2d
+      border_width: 2
+      
+    label:
+      text_color: 0xe0e0e0
+      bg_opa: TRANSP
+    
+    switch:
+      bg_color: 0x2d2d2d
+      border_color: 0x505050
+      border_width: 2
+      radius: 15
+      # Checked/indicator state
+      indicator:
+        bg_color: 0x00aaff
+        border_color: 0x0088cc
+      # Knob styling
+      knob:
+        bg_color: 0xffffff
+        radius: 50
+        pad_all: -4
+    
+    slider:
+      bg_color: 0x2d2d2d
+      border_color: 0x505050
+      border_width: 2
+      radius: 8
+      # Filled indicator portion
+      indicator:
+        bg_color: 0x00aaff
+        radius: 8
+      # Knob styling
+      knob:
+        bg_color: 0xffffff
+        border_color: 0x00aaff
+        border_width: 3
+        radius: 50
+        pad_all: 6
+    
+  pages:
+    - id: main_page
+      bg_color: 0x0d0d0d
+      layout:
+        type: grid
+        grid_rows: [fr(1), fr(1)]
+        grid_columns: [fr(1), fr(1)]
+        pad_row: 10
+        pad_column: 10
+      pad_all: 10
+      widgets:
+        - obj:
+            id: widget_section_top_left
+            <<: *mixin_grid_cells_align_stretch
+            layout:
+              type: grid
+              grid_rows: [fr(2), fr(1), fr(2)]
+              grid_columns: [fr(1)]
+            widgets:
+              - label:
+                  id: widget_clock
+                  text: "..."
+                  grid_cell_x_align: center
+                  text_align: center
+                  text_font: montserrat_65
+              - label:
+                  id: widget_current_outside_climate
+                  text: "..."
+                  text_font: montserrat_20
+                  grid_cell_x_align: center
+                  grid_cell_y_align: center
+              - container:
+                  id: widget_forecast_grid
+                  <<: *mixin_grid_cells_align_stretch
+                  layout:
+                    type: grid
+                    grid_rows: [fr(1), fr(1)]
+                    grid_columns: [fr(1), fr(1), fr(1), fr(1)]
+                  widgets:
+                    - label: 
+                        id: widget_forecast_3h
+                        text: "..."
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_6h
+                        text: "..."
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_9h
+                        text: "..."
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_12h
+                        text: "..."
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_15h
+                        text: "..."
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_18h
+                        text: "..."
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_21h
+                        text: "..."
+                        <<: *mixin_forecast_cell
+                    - label: 
+                        id: widget_forecast_24h
+                        text: "..."
+                        <<: *mixin_forecast_cell
+
+        - obj:
+            id: widget_section_top_right
+            <<: *mixin_grid_cells_align_stretch
+            layout:
+              type: grid
+              grid_rows: [fr(1), fr(1)]
+              grid_columns: [fr(1)]
+            widgets:
+              - label: 
+                  id: widget_sleeping_mode_label
+                  text: "..."
+              #- container:
+                  #grid_cell_x_align: stretch
+                  #grid_cell_y_align: stretch
+              #    widgets:
+              - switch:
+                  id: widget_toggle_sleeping_switch
+                        #width: 80%
+                        #height: 80%
+                  grid_cell_x_align: center
+                  grid_cell_y_align: center
+        - obj:
+            id: widget_section_bottom_left
+            <<: *mixin_grid_cells_align_stretch
+            widgets:
+              - label:
+                  align: center
+                  text: 3
+        - obj:
+            id: widget_section_bottom_right
+            <<: *mixin_grid_cells_align_stretch
+            widgets:
+              - label:
+                  align: center
+                  text: 4

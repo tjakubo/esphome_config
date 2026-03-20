@@ -1,0 +1,9 @@
+packages:
+  diagnostic_common: !include diagnostic.yaml
+
+sensor:
+  - platform: internal_temperature
+    name: "${device_type}/${path}/internal_temperature"
+    filters:
+      - delta: 2.5
+    entity_category: "diagnostic"

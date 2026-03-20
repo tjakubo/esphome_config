@@ -1,0 +1,9 @@
+packages: !include ../actions/ha_input_boolean_control.yaml
+
+binary_sensor:
+  - platform: homeassistant
+    id: binary_sensor_ha_${name}
+    entity_id: ${entity_id}
+    trigger_on_initial_state: true
+    on_state: ${actions}
+    

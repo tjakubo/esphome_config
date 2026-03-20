@@ -1,0 +1,8 @@
+substitutions:
+  path: "bedroom"
+  hostname: "athom-bedroom"
+
+packages:
+  hardware: !include _hardware.athom_ps_c3.yaml
+  device: !include _device.athom_ps.yaml
+  sensors_diagnostic_esp32: !include _sensors.diagnostic.esp32.yaml

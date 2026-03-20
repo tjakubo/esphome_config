@@ -1,0 +1,12 @@
+sensor:
+  - platform: homeassistant
+    id: sensor_ha_forecast_${time_offset}_temperature
+    entity_id: sensor.weather_forecast_${time_offset}_forward
+  - platform: homeassistant
+    id: sensor_ha_forecast_${time_offset}_hour
+    entity_id: sensor.weather_forecast_${time_offset}_forward
+    attribute: hour
+  - platform: homeassistant
+    id: sensor_ha_forecast_${time_offset}_precipitation_probability
+    entity_id: sensor.weather_forecast_${time_offset}_forward
+    attribute: precipitation_probability

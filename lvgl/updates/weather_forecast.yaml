@@ -1,0 +1,9 @@
+lvgl.label.update: 
+  id: widget_forecast_${time_offset}
+  text: !lambda |-
+    return esphome::str_sprintf(
+      "${forecast_format}", 
+      static_cast<int>(id(sensor_ha_forecast_${time_offset}_hour).state), 
+      id(sensor_ha_forecast_${time_offset}_temperature).state,
+      static_cast<int>(id(sensor_ha_forecast_${time_offset}_precipitation_probability).state * 100)
+    );
