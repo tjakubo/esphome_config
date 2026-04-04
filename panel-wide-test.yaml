@@ -1,0 +1,388 @@
+esphome:
+  name: "widepanel"
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: !secret fallback_wifi_ssid
+    password: !secret fallback_wifi_password
+  min_auth_mode: WPA2
+
+network:
+  enable_ipv6: false  
+
+
+output:
+  - id: gpio_backlight_pwm
+    platform: ledc
+    pin: 23
+
+light:
+  - id: backlight
+    name: Backlight
+    platform: monochromatic
+    output: gpio_backlight_pwm
+    restore_mode: ALWAYS_ON
+    
+
+esp32:
+  board: esp32-p4-evboard
+  cpu_frequency: 400MHz
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    advanced:
+      enable_idf_experimental_features: yes 
+      
+lvgl:
+  byte_order: little_endian
+  pages:
+    - id: display_test_page
+      widgets:
+        # Title at top
+        - label:
+            align: TOP_MID
+            y: 10
+            text: "Display Test 480x800"
+            text_font: montserrat_24
+            text_color: 0xFFFFFF
+        
+        # Color test blocks - Row 1
+        - obj:
+            x: 10
+            y: 60
+            width: 100
+            height: 100
+            bg_color: 0xFF0000
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "RED"
+                  text_color: 0xFFFFFF
+        
+        - obj:
+            x: 120
+            y: 60
+            width: 100
+            height: 100
+            bg_color: 0x00FF00
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "GREEN"
+                  text_color: 0x000000
+        
+        - obj:
+            x: 230
+            y: 60
+            width: 100
+            height: 100
+            bg_color: 0x0000FF
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "BLUE"
+                  text_color: 0xFFFFFF
+        
+        - obj:
+            x: 340
+            y: 60
+            width: 100
+            height: 100
+            bg_color: 0xFFFF00
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "YELLOW"
+                  text_color: 0x000000
+        
+        # Color test blocks - Row 2
+        - obj:
+            x: 10
+            y: 170
+            width: 100
+            height: 100
+            bg_color: 0xFF00FF
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "MAGENTA"
+                  text_color: 0xFFFFFF
+        
+        - obj:
+            x: 120
+            y: 170
+            width: 100
+            height: 100
+            bg_color: 0x00FFFF
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "CYAN"
+                  text_color: 0x000000
+        
+        - obj:
+            x: 230
+            y: 170
+            width: 100
+            height: 100
+            bg_color: 0xFFFFFF
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "WHITE"
+                  text_color: 0x000000
+        
+        - obj:
+            x: 340
+            y: 170
+            width: 100
+            height: 100
+            bg_color: 0x000000
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "BLACK"
+                  text_color: 0xFFFFFF
+        
+        # Text size test
+        - label:
+            x: 10
+            y: 290
+            text: "Text Size Test:"
+            text_font: montserrat_16
+            text_color: 0xFFFFFF
+        
+        - label:
+            x: 10
+            y: 320
+            text: "Small Text"
+            text_font: montserrat_12
+            text_color: 0xFFFFFF
+        
+        - label:
+            x: 10
+            y: 345
+            text: "Medium Text"
+            text_font: montserrat_16
+            text_color: 0xFFFFFF
+        
+        - label:
+            x: 10
+            y: 375
+            text: "Large Text"
+            text_font: montserrat_24
+            text_color: 0xFFFFFF
+        
+        # Gradient test
+        - obj:
+            x: 10
+            y: 420
+            width: 460
+            height: 80
+            bg_color: 0xFF0000
+            bg_grad_color: 0x0000FF
+            bg_grad_dir: HOR
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "Horizontal Gradient (Red to Blue)"
+                  text_color: 0xFFFFFF
+        
+        # Animated spinner
+        - spinner:
+            x: 200
+            y: 520
+            width: 80
+            height: 80
+            spin_time: 2s
+            arc_length: 60deg
+            indicator:
+              arc_color: 0x00FF00
+              arc_width: 8
+        
+        - label:
+            align: CENTER
+            x: 0
+            y: 280
+            text: "Animation Test"
+            text_color: 0xFFFFFF
+        
+        # Corner markers to test full screen area
+        - obj:
+            x: 0
+            y: 0
+            width: 30
+            height: 30
+            bg_color: 0xFF0000
+        
+        - obj:
+            x: 450
+            y: 0
+            width: 30
+            height: 30
+            bg_color: 0x00FF00
+        
+        - obj:
+            x: 0
+            y: 770
+            width: 30
+            height: 30
+            bg_color: 0x0000FF
+        
+        - obj:
+            x: 450
+            y: 770
+            width: 30
+            height: 30
+            bg_color: 0xFFFF00
+        
+        # Progress bar with animation
+        - bar:
+            x: 10
+            y: 630
+            width: 460
+            height: 30
+            min_value: 0
+            max_value: 100
+            value: 75
+            indicator:
+              bg_color: 0x00FF00
+        
+        - label:
+            x: 10
+            y: 670
+            text: "Progress Bar Test (75%)"
+            text_color: 0xFFFFFF
+        
+        # Border and outline test
+        - obj:
+            x: 10
+            y: 710
+            width: 200
+            height: 60
+            bg_color: 0x333333
+            border_width: 3
+            border_color: 0xFF00FF
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "Border Test"
+                  text_color: 0xFFFFFF
+        
+        # Pixel test - bottom right info
+        - label:
+            x: 250
+            y: 720
+            text: "Resolution:"
+            text_color: 0xFFFFFF
+        
+        - label:
+            x: 250
+            y: 745
+            text: "480 x 800"
+            text_color: 0x00FF00
+            text_font: montserrat_20
+
+display:
+  - platform: mipi_dsi
+    id: device_display
+    model: JC4880P443
+    byte_order: little_endian
+
+touchscreen:
+  platform: gt911
+  i2c_id: i2c_bus
+  id: device_touchscreen
+  reset_pin: GPIO3
+  update_interval: 100ms
+  transform: #This is for 90 degree display rotation
+    swap_xy: true
+    mirror_x: false
+    mirror_y: true
+    
+esp_ldo:
+  - channel: 3
+    voltage: 2.5V
+
+psram:
+  mode: hex
+  speed: 200MHz
+
+preferences:
+  flash_write_interval: 5min
+
+esp32_hosted:
+  variant: ESP32C6
+  reset_pin: GPIO54
+  cmd_pin: GPIO19
+  clk_pin: GPIO18
+  d0_pin: GPIO14
+  d1_pin: GPIO15
+  d2_pin: GPIO16
+  d3_pin: GPIO17
+  active_high: true
+
+i2c:
+  id: i2c_bus
+  sda: 7
+  scl: 8
+  scan: false
+  frequency: 400kHz
+
+# Audio section
+audio_dac:
+  - platform: es8311
+    id: esp7311_dac
+    address: 0x18
+    i2c_id: i2c_bus
+
+i2s_audio:
+  - id: i2s_bus
+    i2s_lrclk_pin: GPIO10 # WS / LRCK
+    i2s_bclk_pin: GPIO12  # BCLK
+    i2s_mclk_pin: GPIO13  # ES8311 usually requires a Master Clock
+
+microphone:
+  - platform: i2s_audio
+    id: es8311_mic
+    i2s_audio_id: i2s_bus
+    i2s_din_pin: GPIO48  # Data In from the Codec
+    adc_type: external
+    pdm: false           # ES8311 uses standard I2S, not PDM
+    channel: left
+
+speaker:
+  - platform: i2s_audio
+    id: es8311_hardware_out
+    i2s_audio_id: i2s_bus
+    i2s_dout_pin: GPIO9
+    dac_type: external
+    audio_dac: esp7311_dac
+  - platform: mixer
+    id: audio_mixer
+    output_speaker: es8311_hardware_out
+    source_speakers:
+      - id: spk_announcement
+      - id: spk_media
+
+media_player:
+  - platform: speaker
+    name: "XL Speaker"
+    id: xl_media_player
+    # This section is now mandatory for the 'speaker' platform
+    announcement_pipeline:
+      speaker: spk_announcement
+    media_pipeline:
+      speaker: spk_media

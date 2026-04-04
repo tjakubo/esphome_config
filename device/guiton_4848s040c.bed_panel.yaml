@@ -75,6 +75,17 @@ mapping:
       windy-variant: Cloudy & windy
       exceptional: Unusual
       
+number:
+  - platform: template
+    id: number_image_of_the_day_index
+    name: ${device_type}/${path}/image/index
+    min_value: 1
+    max_value: ${ image_of_the_day_count + 1 }
+    step: 1
+    optimistic: true
+    update_interval: never
+    initial_value: 0
+      
 script:
   - id: script_update_time
     then:
@@ -102,7 +113,7 @@ script:
     then: !include 
       file: ../lvgl/updates/24h_weather_forecasts.yaml
       vars:
-        forecast_format: '#808080 %d:00#\n%.1f°\n#8888ff %d%%#'
+        forecast_format: '#808080 %d:00#\n%.1f°\n#8888ff %.gL#'
   - id: script_update_image_of_the_day
     then:
       - online_image.release: online_image_of_the_day
@@ -111,6 +122,9 @@ script:
           url: !lambda |-
             const auto day{ id(ha_time).now().day_of_year + ${image_of_the_day_offset} };
             const auto image_number{ (day % ${image_of_the_day_count}) + 1 };
+            auto call = id(number_image_of_the_day_index).make_call();
+            call.set_value(image_number);
+            call.perform();
             return esphome::str_sprintf("${image_of_the_day_pattern}", image_number);
   - id: script_update_sleeping_mode_widgets
     parameters:
@@ -152,15 +166,14 @@ time:
       - script.execute: script_update_date
     on_time:
       - minutes: '*'
-        seconds: 0
         then:
           script.execute: script_update_time
       - hours: 0
+        minutes: 0
+        seconds: 0
         then:
-          script.execute: script_update_date
-      - hours: 5
-        then:
-          script.execute: script_update_image_of_the_day
+          - script.execute: script_update_date
+          - script.execute: script_update_image_of_the_day
   
 font:
   - file: "fonts/Montserrat-Regular.ttf"

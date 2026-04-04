@@ -16,6 +16,6 @@ packages:
         right_light_entity: light.group_light_bedroom_bed
         sleeping_mode_entity: input_boolean.helper_mode_bedroom_sleeping
         image_of_the_day_pattern: "http://hass.lan/local/md_%d.png"
-        image_of_the_day_count: 2
-        image_of_the_day_offset: 2
+        image_of_the_day_count: 9
+        image_of_the_day_offset: 4
   sensors_diagnostic: !include sensors/diagnostic.esp32.yaml

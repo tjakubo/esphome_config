@@ -5,5 +5,5 @@ lvgl.label.update:
       "${forecast_format}", 
       static_cast<int>(id(sensor_ha_forecast_${time_offset}_hour).state), 
       id(sensor_ha_forecast_${time_offset}_temperature).state,
-      static_cast<int>(id(sensor_ha_forecast_${time_offset}_precipitation_probability).state * 100)
+      id(sensor_ha_forecast_${time_offset}_precipitation_probability).state
     );
